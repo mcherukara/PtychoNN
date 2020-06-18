@@ -1,1 +1,6 @@
+data/20191008_39_diff.npz filter=lfs diff=lfs merge=lfs -text
+data/X_test.npy filter=lfs diff=lfs merge=lfs -text
+data/Y_I_test.npy filter=lfs diff=lfs merge=lfs -text
+data/Y_phi_test.npy filter=lfs diff=lfs merge=lfs -text
+data/20191008_39_amp_pha_10nm_full.npy filter=lfs diff=lfs merge=lfs -text
 data/* filter=lfs diff=lfs merge=lfs -text
