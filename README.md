@@ -14,3 +14,8 @@ git lfs
 Tensorflow 1.14
 
 Keras 2.2.4
+
+### Tensorflow 2.x:
+Tf2 folder contains notebooks compatible with TF 2.x
+
+-- NOTE: notebooks were run in Google Colab, modify as required for local runtimes
