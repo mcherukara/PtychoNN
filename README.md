@@ -20,3 +20,7 @@ Keras 2.2.4
 Tf2 folder contains notebooks compatible with TF 2.x
 
 -- NOTE: notebooks were run in Google Colab, modify as required for local runtimes
+
+### Mixed precision training
+
+Newest version also contains notebooks that use PyTorch and TF2 mixed precision frameworks for faster training. The original PyTorch version is likely using float64, and the mixed precision mode therefore provides substantial acceleration. It looks like the original TF2 code might be using float32, so the mixed precision code only offers slight improvement in runtime. The test results remain unchanged.
