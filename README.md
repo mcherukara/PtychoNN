@@ -12,6 +12,8 @@ git lfs
 
 -- Data to train the network is hosted at the git lfs server due to its size
 
+* Run git-lfs clone https://github.com/mcherukara/PtychoNN to download training and test data
+
 Tensorflow 1.14
 
 Keras 2.2.4
