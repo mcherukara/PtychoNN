@@ -10,7 +10,7 @@ The strucuture of the network is shown below:
 ## Requires:
 git lfs
 
--- Data to train the network is hosted at the git lfs server due to its size
+* Data to train the network is hosted at the git lfs server due to its size
 
 * Run git-lfs clone https://github.com/mcherukara/PtychoNN to download training and test data
 
