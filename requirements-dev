@@ -1,0 +1,9 @@
+ipykernel
+keras
+matplotlib
+numpy
+pytorch-gpu
+scikit-image
+scikit-learn
+tensorflow-gpu
+tqdm
