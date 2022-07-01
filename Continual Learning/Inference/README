@@ -2,3 +2,6 @@ infer_workflow.py - does the inference on trained model using PyTorch
 It also stitches the individual inferences using the positions in the optimized route.npz. 
 The pixel size in the stitiching can be changed accordingly. 
 Typical choices for pixelsize is 8 or 10 nm. 
+
+
+The base path in the code has to be changed in order to run the code. 
