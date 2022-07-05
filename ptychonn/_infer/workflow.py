@@ -8,10 +8,6 @@ import scipy.interpolate
 import torch
 import tqdm
 
-#os.environ['CUDA_VISIBLE_DEVICES'] = '0'#, 1, 2, 3, 4, 5, 6, 7'
-import sys
-#sys.path.append("/grand/hp-ptycho/anakha/S26-beamtime/scripts_avb")
-
 import ptychonn._infer.helper_small_model as helper_small_model
 
 
