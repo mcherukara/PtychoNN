@@ -85,11 +85,7 @@ def infer(
             'ptychonn._infer',
             'weights.pth',
     ) as load_model_path:
-        print('Model path exist:', load_model_path.exists())
-        print('Setting up the inferences...')
-
-        # the test inferences
-        print(f'Loading model at {load_model_path}')
+        click.echo(f'Loading model at {load_model_path}')
         recon_model = helper_small_model.ReconSmallPhaseModel()
         tester = helper_small_model.Tester(
             model=recon_model,
@@ -100,28 +96,24 @@ def infer(
     # Trying the inference for scan_111_000080
     data_path = base_dir / 'src/scan_506_000793.h5'
     inferences_out_file = out_path / 'inferences_506.npz'
-    print('Does data path exist?', data_path.exists())
+    click.echo(f'Does data path exist? {data_path.exists()}')
 
     with h5py.File(data_path) as f:
         X_test_data = f['entry/data/data'][()]
 
     tester.setTestData(X_test_data)
     inferences = tester.predictTestData(npz_save_path=inferences_out_file)
-    print(f'Finished the inference stage and saved at', inferences_out_file)
+    click.echo(f'Finished the inference stage and saved at {inferences_out_file}')
 
-    ### Loading stitched data from saved file
+    # Plotting some summary images
 
-    print('Loading inferences from', inferences_out_file)
-    inferences = np.load(inferences_out_file)['ph']
     stitched = stitch_from_data(inferences, base_dir)
     plt.figure(1, figsize=[8.5, 7])
     plt.pcolormesh(stitched)
-    #plt.gca().set_aspect('equal')
     plt.colorbar()
     plt.tight_layout()
     plt.title('stitched_inferences')
     plt.savefig(out_path / 'stitched_506.png', bbox_inches='tight')
-    plt.show()
 
     test_inferences = [0, 1, 2, 3]
     fig, axs = plt.subplots(1, 4, figsize=[13, 3])
@@ -132,6 +124,5 @@ def infer(
         plt.title('Inference at position {0}'.format(inf))
     plt.tight_layout()
     plt.savefig(out_path / 'inferences_0_to_4_scan506.png', bbox_inches='tight')
-    plt.show()
 
     return 0
