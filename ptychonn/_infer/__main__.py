@@ -99,7 +99,7 @@ def infer(
 
     # Trying the inference for scan_111_000080
     data_path = base_dir / 'src/scan_506_000793.h5'
-    inferences_out_file = base_dir / 'out/inferences_506.npz'
+    inferences_out_file = out_path / 'inferences_506.npz'
     print('Does data path exist?', data_path.exists())
 
     with h5py.File(data_path) as f:
@@ -120,7 +120,7 @@ def infer(
     plt.colorbar()
     plt.tight_layout()
     plt.title('stitched_inferences')
-    plt.savefig('stitched_506.png', bbox_inches='tight')
+    plt.savefig(out_path / 'stitched_506.png', bbox_inches='tight')
     plt.show()
 
     test_inferences = [0, 1, 2, 3]
@@ -131,7 +131,7 @@ def infer(
         plt.colorbar()
         plt.title('Inference at position {0}'.format(inf))
     plt.tight_layout()
-    plt.savefig('inferences_0_to_4_scan506.png', bbox_inches='tight')
+    plt.savefig(out_path / 'inferences_0_to_4_scan506.png', bbox_inches='tight')
     plt.show()
 
     return 0
