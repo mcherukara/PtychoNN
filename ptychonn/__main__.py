@@ -1,24 +1,28 @@
-"""Console script for ptychonn."""
+'''Define the main entry point for the PtychoNN CLI.
+
+The main entry point without subcommands had only one option --version which
+prints the CLI version and exits. All functionality is divided by module
+into subcommands like infer or train.
+'''
 import sys
 import click
 import ptychonn
 
 
 @click.group(invoke_without_command=True)
-@click.option("--version", help="Print version and return.", is_flag=True)
+@click.option('--version', help='Print version and return.', is_flag=True)
 def main(version):
-    """Console script for ptychonn."""
-    if version:
-        click.echo(f"ptychonn {ptychonn.__version__}")
-        return 0
+    '''Deep learning of ptychographic imaging.
 
-    click.echo("Replace this message by putting your code into "
-               "ptychonn.cli.main")
-    click.echo("See click documentation at https://click.palletsprojects.com/")
+    https://doi.org/10.1063/5.0013065
+    '''
+    if version:
+        click.echo(f'ptychonn {ptychonn.__version__}')
+        return 0
     return 0
 
 
 main.add_command(ptychonn.infer)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())  # pragma: no cover
