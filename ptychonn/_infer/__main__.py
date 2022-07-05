@@ -9,7 +9,7 @@ import scipy.interpolate
 import torch
 import tqdm
 
-import ptychonn._infer.helper_small_model as helper_small_model
+import ptychonn._model as helper_small_model
 
 
 def stitch_from_data(inferences, base_dir, pix=None):
@@ -81,16 +81,21 @@ def infer(
     NGPUS = torch.cuda.device_count()
     BATCH_SIZE = NGPUS * 64
 
-    with importlib.resources.path('ptychonn._infer', 'weights.pth') as load_model_path:
+    with importlib.resources.path(
+            'ptychonn._infer',
+            'weights.pth',
+    ) as load_model_path:
         print('Model path exist:', load_model_path.exists())
         print('Setting up the inferences...')
 
         # the test inferences
         print(f'Loading model at {load_model_path}')
         recon_model = helper_small_model.ReconSmallPhaseModel()
-        tester = helper_small_model.Tester(model=recon_model,
-                                        batch_size=BATCH_SIZE,
-                                        model_params_path=load_model_path)
+        tester = helper_small_model.Tester(
+            model=recon_model,
+            batch_size=BATCH_SIZE,
+            model_params_path=load_model_path,
+        )
 
     # Trying the inference for scan_111_000080
     data_path = base_dir / 'src/scan_506_000793.h5'
