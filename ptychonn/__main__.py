@@ -4,7 +4,7 @@ import click
 import ptychonn
 
 
-@click.command()
+@click.group(invoke_without_command=True)
 @click.option("--version", help="Print version and return.", is_flag=True)
 def main(version):
     """Console script for ptychonn."""
@@ -17,6 +17,8 @@ def main(version):
     click.echo("See click documentation at https://click.palletsprojects.com/")
     return 0
 
+
+main.add_command(ptychonn.infer)
 
 if __name__ == "__main__":
     sys.exit(main())  # pragma: no cover

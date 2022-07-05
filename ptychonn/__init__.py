@@ -5,3 +5,5 @@ try:
 except PackageNotFoundError:
     # package is not installed
     pass
+
+from ptychonn._infer.workflow import infer
