@@ -4,7 +4,7 @@ import click
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy
+import scipy.interpolate
 import torch
 import tqdm
 
