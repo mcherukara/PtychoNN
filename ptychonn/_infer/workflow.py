@@ -15,11 +15,11 @@ import sys
 import ptychonn._infer.helper_small_model as helper_small_model
 
 
-def stitch_from_data(inferences, pix=None):
+def stitch_from_data(inferences, base_dir, pix=None):
     ## parameters required for stitching individual inferences
     spiral_step = 0.05
 
-    spiral_traj = np.load("src/optimized_route.npz")  ##
+    spiral_traj = np.load(base_dir / "src/optimized_route.npz")  ##
     step = spiral_step * -1e-6
     pos_x, pos_y = spiral_traj['x'] * step, spiral_traj['y'] * step
 
@@ -111,7 +111,7 @@ def infer(
 
     print('Loading inferences from', inferences_out_file)
     inferences = np.load(inferences_out_file)['ph']
-    stitched = stitch_from_data(inferences)
+    stitched = stitch_from_data(inferences, base_dir)
     plt.figure(1, figsize=[8.5, 7])
     plt.pcolormesh(stitched)
     #plt.gca().set_aspect('equal')
