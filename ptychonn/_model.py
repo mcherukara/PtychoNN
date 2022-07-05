@@ -108,10 +108,8 @@ class Tester():
                 phs_eval.append(ph_eval[j].detach().to("cpu").numpy())
         self.phs_eval = np.array(phs_eval).squeeze().astype('float32')
         if npz_save_path is not None:
-            np.savez_compressed(
-                npz_save_path,
-                ph=self.phs_eval)  #mag=self.amps_eval, ph=self.phs_eval)
-        #return self.amps_eval, self.phs_eval
+            np.savez_compressed(npz_save_path, ph=self.phs_eval)
+            print(f'Finished the inference stage and saved at {npz_save_path}')
         return self.phs_eval
 
     def calcErrors(self, phs_true: np.ndarray, npz_save_path: str = None):

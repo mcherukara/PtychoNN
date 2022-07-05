@@ -7,6 +7,7 @@ into subcommands like infer or train.
 import sys
 import click
 import ptychonn
+import ptychonn._infer.__main__
 
 
 @click.group(invoke_without_command=True)
@@ -22,7 +23,7 @@ def main(version):
     return 0
 
 
-main.add_command(ptychonn.infer)
+main.add_command(ptychonn._infer.__main__.infer_cli)
 
 if __name__ == '__main__':
     sys.exit(main())  # pragma: no cover
