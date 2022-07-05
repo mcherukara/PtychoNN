@@ -1,4 +1,5 @@
 import pathlib
+import importlib.resources
 
 import click
 import h5py
@@ -15,7 +16,7 @@ def stitch_from_data(inferences, base_dir, pix=None):
     ## parameters required for stitching individual inferences
     spiral_step = 0.05
 
-    spiral_traj = np.load(base_dir / "src/optimized_route.npz")  ##
+    spiral_traj = np.load(base_dir / 'src/optimized_route.npz')  ##
     step = spiral_step * -1e-6
     pos_x, pos_y = spiral_traj['x'] * step, spiral_traj['y'] * step
 
@@ -75,21 +76,21 @@ def infer(
     base_dir: pathlib.Path,
     out_path: pathlib.Path,
 ):
-    '''Run inference workflow.'''
+    '''Run the inference workflow.'''
 
     NGPUS = torch.cuda.device_count()
     BATCH_SIZE = NGPUS * 64
 
-    load_model_path = base_dir / 'src/best_model.pth'
-    print("Model path exist:", load_model_path.exists())
-    print('Setting up the inferences...')
+    with importlib.resources.path('ptychonn._infer', 'weights.pth') as load_model_path:
+        print('Model path exist:', load_model_path.exists())
+        print('Setting up the inferences...')
 
-    # the test inferences
-    print(f'Loading model at {load_model_path}')
-    recon_model = helper_small_model.ReconSmallPhaseModel()
-    tester = helper_small_model.Tester(model=recon_model,
-                                       batch_size=BATCH_SIZE,
-                                       model_params_path=load_model_path)
+        # the test inferences
+        print(f'Loading model at {load_model_path}')
+        recon_model = helper_small_model.ReconSmallPhaseModel()
+        tester = helper_small_model.Tester(model=recon_model,
+                                        batch_size=BATCH_SIZE,
+                                        model_params_path=load_model_path)
 
     # Trying the inference for scan_111_000080
     data_path = base_dir / 'src/scan_506_000793.h5'
