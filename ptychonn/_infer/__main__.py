@@ -14,8 +14,10 @@ import ptychonn._model as helper_small_model
 
 def stitch_from_inference(
     inferences: np.array,
-    scan_path: pathlib.Path,
-    pix=None,
+    scan: np.array,
+    pix: int = 0,
+    stitched_pixel_width: float = 10e-9,
+    inference_pixel_width: float = 10e-9,
 ) -> np.array:
     '''Combine many overlapping inferred patches into a single image.
 
@@ -23,43 +25,43 @@ def stitch_from_inference(
     ----------
     inferences : (POSITION, WIDTH, HEIGHT)
         Overlapping patches of the inferred field of view.
-    scan_path : (POSITION, 2)
+    scan : (POSITION, 2)
         The relative coordinates of each of the overlapping patches.
-    pix : ?
-        UNKNOWN
+    pix : int
+        Shrink the interpolation region by this number of pixels.
+    stitched_pixel_width : float [m]
+        The width of a pixel in the stitched image.
+    inference_pixel_width : float [m]
+        The width of a pixel in the inferred image patches.
 
     Returns
     -------
     stitched : (COMBINED_WIDTH, COMBINED_HEIGHT) np.array
         The stitched together image.
     '''
-    ## parameters required for stitching individual inferences
-    spiral_step = 0.05
+    pos_x = scan[..., 0]
+    pos_y = scan[..., 1]
 
-    spiral_traj = np.load(scan_path)
-    step = spiral_step * -1e-6
-    pos_x, pos_y = spiral_traj['x'] * step, spiral_traj['y'] * step
-
-    x = np.arange(pos_x.min() - 0.5e-6, pos_x.max() + 0.5e-6, 10e-9)
-    y = np.arange(pos_y.min() - 0.5e-6, pos_y.max() + 0.5e-6, 10e-9)
+    # The global axes of the stitched image in meters
+    x = np.arange(pos_x.min(),
+                  pos_x.max() + inferences.shape[-1] * inference_pixel_width,
+                  step=stitched_pixel_width)
+    y = np.arange(pos_y.min(),
+                  pos_y.max() + inferences.shape[-1] * inference_pixel_width,
+                  step=stitched_pixel_width)
 
     result = np.zeros((y.shape[0], x.shape[0]))
-    cnt = np.copy(result)
-    cnt1 = cnt + 1
+    cnt = np.zeros_like(result)
 
-    xx = np.arange(128) * 10e-9
-    xx -= xx.mean()
-    yy = np.copy(xx)
+    # The local axes of the inference patches meters
+    xx = np.arange(inferences.shape[-1]) * inference_pixel_width
 
-    result = np.zeros((375, 375))
-    tmp_view = np.zeros((963, 375, 375))
-
-    for i in tqdm.tqdm(range(0, 963), leave=False):
+    for i in tqdm.tqdm(range(len(inferences)), leave=False):
         data_ = inferences[i]
         xxx = xx + pos_x[i]
-        yyy = yy + pos_y[i]
+        yyy = xx + pos_y[i]
 
-        if pix is not None:
+        if pix > 0:
             xxx = xxx[pix:-pix]
             yyy = yyy[pix:-pix]
             data_ = data_[pix:-pix, pix:-pix]
@@ -73,9 +75,8 @@ def stitch_from_inference(
         tmp = find_pha(x, y)
         cnt += tmp != 0
         result += tmp
-        tmp_view[i] = tmp[:, ::-1]
-    stitched = result / np.maximum(cnt, cnt1)
-    return stitched
+
+    return result / np.maximum(cnt, 1)
 
 
 @click.command(name='infer')
@@ -121,9 +122,14 @@ def infer_cli(
         inferences_out_file=inferences_out_file,
     )
 
-    # Plotting some summary images
+    ## parameters required for stitching individual inferences
+    spiral_step = 0.05
+    step = spiral_step * -1e-6
+    spiral_traj = np.load(scan_path)
+    scan = np.stack((spiral_traj['x'], spiral_traj['y']), axis=-1) * step
+    stitched = stitch_from_inference(inferences, scan)
 
-    stitched = stitch_from_inference(inferences, scan_path)
+    # Plotting some summary images
     plt.figure(1, figsize=[8.5, 7])
     plt.pcolormesh(stitched)
     plt.colorbar()
