@@ -117,7 +117,6 @@ def infer_cli(
         data = f['entry/data/data'][()]
 
     inferences = infer(
-        ngpus=torch.cuda.device_count(),
         data=data,
         inferences_out_file=inferences_out_file,
     )
@@ -148,20 +147,20 @@ def infer_cli(
 def infer(
     data: np.array,
     *,
-    ngpus: int = 1,
     inferences_out_file: pathlib.Path = None,
 ) -> np.array:
     '''Infer ptychography reconstruction for the given data.
 
-    For each diffraction pattern in data, the corresponding patch of object
-    is reconstructed.
+    For each diffraction pattern in data, the corresponding patch of object is
+    reconstructed.
+
+    Set the CUDA_VISIBLE_DEVICES environment variable to control which GPUs
+    will be used.
 
     Parameters
     ----------
     data : (POSITION, WIDTH, HEIGHT)
         Diffraction patterns to be reconstructed.
-    ngpus : int > 0
-        The number of GPUs to use for inference.
     inferences_out_file : pathlib.Path
         Optional file to save reconstructed patches.
 
@@ -179,7 +178,7 @@ def infer(
         recon_model = helper_small_model.ReconSmallPhaseModel()
         tester = helper_small_model.Tester(
             model=recon_model,
-            batch_size=ngpus * 64,
+            batch_size=max(torch.cuda.device_count(), 1) * 64,
             model_params_path=load_model_path,
         )
 

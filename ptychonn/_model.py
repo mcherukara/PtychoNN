@@ -5,7 +5,6 @@ from torch.utils.data import TensorDataset, DataLoader
 
 
 class ReconSmallPhaseModel(nn.Module):
-
     def __init__(self, nconv: int = 16):
         super(ReconSmallPhaseModel, self).__init__()
         self.nconv = nconv
@@ -71,22 +70,24 @@ class ReconSmallPhaseModel(nn.Module):
 
 
 class Tester():
+    def __init__(
+        self,
+        model: ReconSmallPhaseModel,
+        batch_size: int,
+        model_params_path: str,
+    ):
 
-    def __init__(self, model: ReconSmallPhaseModel, batch_size: int,
-                 model_params_path: str):
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Let's use {torch.cuda.device_count()} GPUs!")
 
         self.model = model
         self.batch_size = batch_size
         self.model_params_path = model_params_path
 
-        self.model.load_state_dict(torch.load(self.model_params_path))
-
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
-        if torch.cuda.device_count() > 1:
-            print("Let's use", torch.cuda.device_count(), "GPUs!")
-            self.model = nn.DataParallel(self.model)  #Default all devices
-
+        self.model.load_state_dict(
+            torch.load(self.model_params_path, map_location=self.device))
+        self.model = nn.DataParallel(self.model)  #Default all devices
         self.model = self.model.to(self.device)
 
     def setTestData(self, X_test: np.ndarray):
