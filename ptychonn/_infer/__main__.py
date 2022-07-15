@@ -1,10 +1,12 @@
-import pathlib
 import importlib.resources
+import pathlib
+import typing
 
 import click
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import scipy.interpolate
 import torch
 import tqdm
@@ -13,12 +15,13 @@ import ptychonn._model as helper_small_model
 
 
 def stitch_from_inference(
-    inferences: np.array,
-    scan: np.array,
+    inferences: npt.NDArray,
+    scan: npt.NDArray,
+    *,
+    stitched_pixel_width: float,
+    inference_pixel_width: float,
     pix: int = 0,
-    stitched_pixel_width: float = 10e-9,
-    inference_pixel_width: float = 10e-9,
-) -> np.array:
+) -> npt.NDArray:
     '''Combine many overlapping inferred patches into a single image.
 
     Parameters
@@ -127,7 +130,12 @@ def infer_cli(
     step = spiral_step * -1e-6
     spiral_traj = np.load(scan_path)
     scan = np.stack((spiral_traj['x'], spiral_traj['y']), axis=-1) * step
-    stitched = stitch_from_inference(inferences, scan)
+    stitched = stitch_from_inference(
+        inferences,
+        scan,
+        stitched_pixel_width=10e-9,
+        inference_pixel_width=10e-9,
+    )
 
     # Plotting some summary images
     plt.figure(1, figsize=[8.5, 7])
@@ -151,10 +159,10 @@ def infer_cli(
 
 
 def infer(
-    data: np.array,
+    data: npt.NDArray,
     *,
-    inferences_out_file: pathlib.Path = None,
-) -> np.array:
+    inferences_out_file: typing.Optional[pathlib.Path] = None,
+) -> npt.NDArray:
     '''Infer ptychography reconstruction for the given data.
 
     For each diffraction pattern in data, the corresponding patch of object is
