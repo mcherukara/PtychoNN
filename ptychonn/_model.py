@@ -1,3 +1,7 @@
+import importlib.resources
+import pathlib
+import typing
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -5,6 +9,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 
 class ReconSmallPhaseModel(nn.Module):
+
     def __init__(self, nconv: int = 16):
         super(ReconSmallPhaseModel, self).__init__()
         self.nconv = nconv
@@ -70,32 +75,40 @@ class ReconSmallPhaseModel(nn.Module):
 
 
 class Tester():
+    '''
+    '''
+
     def __init__(
         self,
-        model: ReconSmallPhaseModel,
-        batch_size: int,
-        model_params_path: str,
+        *,
+        model: typing.Optional[nn.Module] = None,
+        model_params_path: typing.Optional[pathlib.Path] = None,
     ):
-
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
         print(f"Let's use {torch.cuda.device_count()} GPUs!")
 
-        self.model = model
-        self.batch_size = batch_size
-        self.model_params_path = model_params_path
+        if model is None or model_params_path is None:
+            self.model = ReconSmallPhaseModel()
+            with importlib.resources.path(
+                    'ptychonn._infer',
+                    'weights.pth',
+            ) as model_params_path:
+                self.model.load_state_dict(
+                    torch.load(model_params_path, map_location=self.device))
+        else:
+            self.model = model
+            self.model.load_state_dict(
+                torch.load(model_params_path, map_location=self.device))
 
-        self.model.load_state_dict(
-            torch.load(self.model_params_path, map_location=self.device))
         self.model = nn.DataParallel(self.model)  #Default all devices
         self.model = self.model.to(self.device)
 
-    def setTestData(self, X_test: np.ndarray):
+    def setTestData(self, X_test: np.ndarray, batch_size: int):
         self.X_test = torch.tensor(X_test[:, None, ...].astype('float32'))
         self.test_data = TensorDataset(self.X_test)
-
         self.testloader = DataLoader(self.test_data,
-                                     batch_size=self.batch_size,
+                                     batch_size=batch_size,
                                      shuffle=False,
                                      num_workers=4)
 

@@ -1,4 +1,3 @@
-import importlib.resources
 import pathlib
 import typing
 
@@ -183,20 +182,9 @@ def infer(
     inferences : (POSITION, WIDTH, HEIGHT)
         The reconstructed patches inferred by the model.
     '''
-
-    with importlib.resources.path(
-            'ptychonn._infer',
-            'weights.pth',
-    ) as load_model_path:
-        click.echo(f'Loading model at {load_model_path}')
-        recon_model = helper_small_model.ReconSmallPhaseModel()
-        tester = helper_small_model.Tester(
-            model=recon_model,
-            batch_size=max(torch.cuda.device_count(), 1) * 64,
-            model_params_path=load_model_path,
-        )
-
-    tester.setTestData(data)
-    inferences = tester.predictTestData(npz_save_path=inferences_out_file)
-
-    return inferences
+    tester = helper_small_model.Tester()
+    tester.setTestData(
+        data,
+        batch_size=max(torch.cuda.device_count(), 1) * 64,
+    )
+    return tester.predictTestData(npz_save_path=inferences_out_file)
