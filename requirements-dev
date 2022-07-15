@@ -1,9 +1,10 @@
-ipykernel
-keras
+click
+h5py
+importlib-metadata
+importlib-resources
 matplotlib
-numpy
-pytorch-gpu
+numpy ~=1.21
+pytorch
 scikit-image
-scikit-learn
-tensorflow-gpu
+scipy
 tqdm
