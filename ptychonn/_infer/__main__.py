@@ -27,8 +27,8 @@ def stitch_from_inference(
     ----------
     inferences : (POSITION, WIDTH, HEIGHT)
         Overlapping patches of the inferred field of view.
-    scan : (POSITION, 2)
-        The relative coordinates of each of the overlapping patches.
+    scan : (POSITION, 2) [m]
+        The coordinates of each of the overlapping patches.
     pix : int
         Shrink the interpolation region by this number of pixels.
     stitched_pixel_width : float [m]
