@@ -1,0 +1,10 @@
+click
+h5py
+importlib-metadata
+importlib-resources
+matplotlib
+numpy ~=1.21
+pytorch
+scikit-image
+scipy
+tqdm
