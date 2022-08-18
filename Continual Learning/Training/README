@@ -1,0 +1,4 @@
+This folder has the continual learning code for PtychoNN. 
+
+small_1_ptychonn_model.py -- main code for training
+dataPrepPtychoNN_tiff.py -- script for prepping the data for PtychoNN

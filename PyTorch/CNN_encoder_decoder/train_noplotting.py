@@ -37,8 +37,8 @@ if (not os.path.isdir(MODEL_SAVE_PATH)):
     os.mkdir(MODEL_SAVE_PATH)
 
 # data path
-data_path = path + '/../data/20191008_39_diff.npz'
-label_path = path + '/../data/20191008_39_amp_pha_10nm_full.npy'
+data_path = path + '/../../data/20191008_39_diff.npz'
+label_path = path + '/../../data/20191008_39_amp_pha_10nm_full.npy'
 
 
 def prepare_dataloader(datapath,
