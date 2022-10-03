@@ -1,5 +1,6 @@
 include LICENSE
 include README.md
+include ptychonn/_infer/*.pth
 
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
