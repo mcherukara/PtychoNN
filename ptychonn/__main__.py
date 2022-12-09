@@ -24,6 +24,7 @@ def main(version):
 
 
 main.add_command(ptychonn._infer.__main__.infer_cli)
+main.add_command(ptychonn._train.__main__.train_cli)
 
 if __name__ == '__main__':
     sys.exit(main())  # pragma: no cover
