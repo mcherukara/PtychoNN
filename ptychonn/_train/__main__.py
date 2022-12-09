@@ -37,17 +37,6 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.argument(
-    'model_params_path',
-    type=click.Path(
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        readable=True,
-        writable=True,
-        path_type=pathlib.Path,
-    ),
-)
-@click.argument(
     'out_dir',
     type=click.Path(
         exists=False,
@@ -63,14 +52,14 @@ def train_cli(
     model_params_path: pathlib.Path,
     out_dir: pathlib.Path,
 ):
+    """Train a model from diffraction patterns and reconstructed patches."""
     data = np.load(data_path)
     patches = np.load(patch_path)
     train(
         X_train=data,
         Y_train=patches,
-        best_model_params_path=model_params_path,
         iteration_out_path=out_dir,
-        epochs=1,
+        epochs=1000,
         batch_size=64,
     )
 
@@ -78,7 +67,6 @@ def train_cli(
 def train(
     X_train: npt.NDArray[np.float],
     Y_train: npt.NDArray[np.complex],
-    best_model_params_path: pathlib.Path,
     iteration_out_path: pathlib.Path,
     load_model_path: pathlib.Path | None = None,
     epochs: int = 1,
@@ -104,7 +92,7 @@ def train(
     if load_model_path is not None:
         logger.info(
             "Loading previous best model to initialize the training model.")
-        recon_model.load_state_dict(torch.load(best_model_params_path))
+        recon_model.load_state_dict(torch.load(load_model_path))
 
     trainer = Trainer(
         recon_model,
@@ -121,12 +109,12 @@ def train(
     trainer.run(epochs)
 
     trainer.plotLearningRate(
-        save_fname=iteration_out_path + '/learning_rate.svg',
+        save_fname=iteration_out_path / 'learning_rate.svg',
         show_fig=False,
     )
     ptychonn.plot.plot_metrics(
         trainer.metrics,
-        save_fname=iteration_out_path + '/metrics.svg',
+        save_fname=iteration_out_path / 'metrics.svg',
         show_fig=False,
     )
 
@@ -139,7 +127,7 @@ class Trainer():
         self,
         model: ptychonn.model.ReconSmallPhaseModel,
         batch_size: int,
-        output_path: str,
+        output_path: pathlib.Path,
         output_suffix: str,
     ):
         logger.info("Initializing the training procedure...")
@@ -233,7 +221,7 @@ class Trainer():
             logger.info("Phase loss", loss_ph)
             break
 
-    def initModel(self, model_params_path: str = None):
+    def initModel(self, model_params_path: pathlib.Path|None = None):
 
         self.model_params_path = model_params_path
         if model_params_path is not None:
@@ -342,22 +330,22 @@ class Trainer():
     #Function to update saved model if validation loss is minimum
     def updateSavedModel(
         model: ptychonn.model.ReconSmallPhaseModel,
-        path: str,
+        path: pathlib.Path,
         output_suffix: str = '',
     ):
         if not os.path.isdir(path):
             os.mkdir(path)
-        fname = path + '/best_model' + output_suffix + '.pth'
+        fname = path / ('best_model' + output_suffix + '.pth')
         logger.info("Saving best model as %s", fname)
         torch.save(model.state_dict(), fname)
 
     @staticmethod
     def saveMetrics(
         metrics: dict,
-        path: str,
+        path: pathlib.Path,
         output_suffix: str = '',
     ):
-        np.savez(path + '/metrics' + output_suffix + '.npz', **metrics)
+        np.savez(path / ('metrics' + output_suffix + '.npz'), **metrics)
 
     def run(self, epochs: int, output_frequency: int = 1):
         for epoch in range(epochs):
