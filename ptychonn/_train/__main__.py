@@ -20,29 +20,59 @@ logger = logging.getLogger(__name__)
     'data_path',
     type=click.Path(
         exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
         path_type=pathlib.Path,
     ),
 )
 @click.argument(
-    'scan_path',
+    'patch_path',
     type=click.Path(
         exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        path_type=pathlib.Path,
+    ),
+)
+@click.argument(
+    'model_params_path',
+    type=click.Path(
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        writable=True,
         path_type=pathlib.Path,
     ),
 )
 @click.argument(
     'out_dir',
     type=click.Path(
-        exists=True,
+        exists=False,
+        writable=True,
+        dir_okay=True,
+        file_okay=False,
         path_type=pathlib.Path,
     ),
 )
 def train_cli(
     data_path: pathlib.Path,
-    scan_path: pathlib.Path,
+    patch_path: pathlib.Path,
+    model_params_path: pathlib.Path,
     out_dir: pathlib.Path,
 ):
-    return
+    data = np.load(data_path)
+    patches = np.load(patch_path)
+    train(
+        X_train=data,
+        Y_train=patches,
+        best_model_params_path=model_params_path,
+        iteration_out_path=out_dir,
+        epochs=1,
+        batch_size=64,
+    )
 
 
 def train(
@@ -62,16 +92,20 @@ def train(
         The diffraction patterns.
     Y_train (N, WIDTH, HEIGHT)
         The corresponding reconstructed patches for the diffraction patterns.
+    best_model_params_path
+        Where you want to save the trained model. Will be overwritten.
+    iteration_out_path
+        ?
+    load_model_path
+        Load a previous model but don't overwrite.
     """
-
     logger.info("Creating the training model...")
-    recon_model = ReconSmallPhaseModel()
+    recon_model = ptychonn.model.ReconSmallPhaseModel()
     if load_model_path is not None:
         logger.info(
             "Loading previous best model to initialize the training model.")
         recon_model.load_state_dict(torch.load(best_model_params_path))
 
-    logger.info("Initializing the training procedure...")
     trainer = Trainer(
         recon_model,
         batch_size=batch_size * torch.cuda.device_count(),
@@ -79,14 +113,12 @@ def train(
         output_suffix='',
     )
 
-    logger.info("Setting training data...")
     trainer.setTrainingData(X_train, Y_train)
 
-    logger.info("Setting optimization parameters...")
     trainer.setOptimizationParams()
     trainer.initModel()
 
-    train_time = trainer.run(epochs)
+    trainer.run(epochs)
 
     trainer.plotLearningRate(
         save_fname=iteration_out_path + '/learning_rate.svg',
@@ -97,8 +129,6 @@ def train(
         save_fname=iteration_out_path + '/metrics.svg',
         show_fig=False,
     )
-
-    return train_time
 
 
 class Trainer():
@@ -112,6 +142,7 @@ class Trainer():
         output_path: str,
         output_suffix: str,
     ):
+        logger.info("Initializing the training procedure...")
         self.model = model
         self.batch_size = batch_size
         self.output_path = output_path
@@ -124,6 +155,7 @@ class Trainer():
         Y_ph_train_full: np.ndarray,
         valid_data_ratio: float = 0.1,
     ):
+        logger.info("Setting training data...")
 
         self.H, self.W = X_train_full.shape[-2:]
 
@@ -162,16 +194,18 @@ class Trainer():
         max_lr: float = 5e-4,
         min_lr: float = 1e-4,
     ):
+        logger.info("Setting optimization parameters...")
         #Optimizer details
 
         #Paper recommends 2-10 number of iterations
         self.epochs_per_half_cycle = epochs_per_half_cycle
         self.iters_per_half_cycle = epochs_per_half_cycle * self.iters_per_epoch
 
-        print(
-            "LR step size is:", self.iters_per_half_cycle,
-            "which is every %d epochs" %
-            (self.iters_per_half_cycle / self.iters_per_epoch))
+        logger.info(
+            "LR step size is: %d which is every %d epochs",
+            self.iters_per_half_cycle,
+            self.iters_per_half_cycle / self.iters_per_epoch,
+        )
 
         self.max_lr = max_lr
         self.min_lr = min_lr
@@ -190,13 +224,13 @@ class Trainer():
 
     def testForwardSingleBatch(self):
         for ft_images, phs in self.trainloader:
-            print("batch size:", ft_images.shape)
+            logger.info("batch size:", ft_images.shape)
             ph_train = self.model(ft_images)
-            print("Phase batch shape: ", ph_train.shape)
-            print("Phase batch dtype", ph_train.dtype)
+            logger.info("Phase batch shape: ", ph_train.shape)
+            logger.info("Phase batch dtype", ph_train.dtype)
 
             loss_ph = self.criterion(ph_train, phs, self.ntrain)
-            print("Phase loss", loss_ph)
+            logger.info("Phase loss", loss_ph)
             break
 
     def initModel(self, model_params_path: str = None):
@@ -209,23 +243,24 @@ class Trainer():
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
         if torch.cuda.device_count() > 1:
-            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            logger.info("Let's use %d GPUs!", torch.cuda.device_count())
             # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-            self.model = nn.DataParallel(self.model)  #Default all devices
+            self.model = torch.nn.DataParallel(
+                self.model)  #Default all devices
 
         self.model = self.model.to(self.device)
 
-        print("Setting up mixed precision gradient calculation...")
+        logger.info("Setting up mixed precision gradient calculation...")
         self.scaler = torch.cuda.amp.GradScaler()
 
-        print("Setting up metrics...")
+        logger.info("Setting up metrics...")
         self.metrics = {
             'losses': [],
             'val_losses': [],
             'lrs': [],
             'best_val_loss': np.inf
         }
-        print(self.metrics)
+        logger.info(self.metrics)
 
     def train(self):
         tot_loss = 0.0
@@ -285,9 +320,11 @@ class Trainer():
         #Update saved model if val loss is lower
 
         if (tot_val_loss < self.metrics['best_val_loss']):
-            print(
-                "Saving improved model after Val Loss improved from %.5f to %.5f"
-                % (self.metrics['best_val_loss'], tot_val_loss))
+            logger.info(
+                "Saving improved model after Val Loss improved from %.5f to %.5f",
+                self.metrics['best_val_loss'],
+                tot_val_loss,
+            )
             self.metrics['best_val_loss'] = tot_val_loss
             self.updateSavedModel(self.model, self.output_path,
                                   self.output_suffix)
@@ -311,7 +348,7 @@ class Trainer():
         if not os.path.isdir(path):
             os.mkdir(path)
         fname = path + '/best_model' + output_suffix + '.pth'
-        print("Saving best model as ", fname)
+        logger.info("Saving best model as %s", fname)
         torch.save(model.state_dict(), fname)
 
     @staticmethod
@@ -337,32 +374,48 @@ class Trainer():
             #Validation loop
             self.validate()
             if epoch % output_frequency == 0:
-                print('Epoch: %d | FT  | Train Loss: %.5f | Val Loss: %.5f' %
-                      (epoch, self.metrics['losses'][-1][0],
-                       self.metrics['val_losses'][-1][0]))
-                print('Epoch: %d | Ph  | Train Loss: %.3f | Val Loss: %.3f' %
-                      (epoch, self.metrics['losses'][-1][1],
-                       self.metrics['val_losses'][-1][1]))
-                print('Epoch: %d | Ending LR: %.6f ' %
-                      (epoch, self.metrics['lrs'][-1][0]))
-                print()
+                logger.info(
+                    'Epoch: %d | FT  | Train Loss: %.5f | Val Loss: %.5f',
+                    epoch,
+                    self.metrics['losses'][-1][0],
+                    self.metrics['val_losses'][-1][0],
+                )
+                logger.info(
+                    'Epoch: %d | Ph  | Train Loss: %.3f | Val Loss: %.3f',
+                    epoch,
+                    self.metrics['losses'][-1][1],
+                    self.metrics['val_losses'][-1][1],
+                )
+                logger.info(
+                    'Epoch: %d | Ending LR: %.6f ',
+                    epoch,
+                    self.metrics['lrs'][-1][0],
+                )
 
-    def plotLearningRate(self, save_fname: str = None, show_fig: bool = True):
-        batches = np.linspace(0, len(self.metrics['lrs']),
-                              len(self.metrics['lrs']) + 1)
+    def plotLearningRate(
+        self,
+        save_fname: pathlib.Path | None = None,
+        show_fig: bool = True,
+    ):
+        batches = np.linspace(
+            0,
+            len(self.metrics['lrs']),
+            len(self.metrics['lrs']) + 1,
+        )
         epoch_list = batches / self.iters_per_epoch
 
         import matplotlib.pyplot as plt
 
+        f = plt.figure()
         plt.plot(epoch_list[1:], self.metrics['lrs'], 'C3-')
         plt.grid()
         plt.ylabel("Learning rate")
         plt.xlabel("Epoch")
-
         plt.tight_layout()
+
         if save_fname is not None:
             plt.savefig(save_fname)
         if show_fig:
             plt.show()
         else:
-            plt.close()
+            plt.close(f)
