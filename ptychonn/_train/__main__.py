@@ -49,17 +49,19 @@ logger = logging.getLogger(__name__)
 def train_cli(
     data_path: pathlib.Path,
     patch_path: pathlib.Path,
-    model_params_path: pathlib.Path,
     out_dir: pathlib.Path,
 ):
     """Train a model from diffraction patterns and reconstructed patches."""
-    data = np.load(data_path)
-    patches = np.load(patch_path)
+    logging.basicConfig(
+        level=logging.INFO,
+    )
+    data = np.load(data_path).astype('float32')
+    patches = np.load(patch_path).astype('float32')
     train(
         X_train=data,
         Y_train=patches,
         iteration_out_path=out_dir,
-        epochs=1000,
+        epochs=100,
         batch_size=64,
     )
 
@@ -276,6 +278,7 @@ class Trainer():
             loss_ph += loss_p.detach().item()
 
             #Update the LR according to the schedule -- CyclicLR updates each batch
+            self.optimizer.step()
             self.scheduler.step()
             self.metrics['lrs'].append(self.scheduler.get_last_lr())
             self.scaler.update()
