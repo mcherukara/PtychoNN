@@ -156,34 +156,47 @@ class Trainer():
 
         self.H, self.W = X_train_full.shape[-2:]
 
-        self.X_train_full = torch.tensor(X_train_full[:, None,
-                                                      ...].astype('float32'))
+        self.X_train_full = torch.tensor(
+            X_train_full[:, None, ...],
+            dtype=torch.float32,
+        )
         self.Y_ph_train_full = torch.tensor(
-            Y_ph_train_full[:, None, ...].astype('float32'))
+            Y_ph_train_full[:, None, ...],
+            dtype=torch.float32,
+        )
         self.ntrain_full = self.X_train_full.shape[0]
 
         self.valid_data_ratio = valid_data_ratio
         self.nvalid = int(self.ntrain_full * self.valid_data_ratio)
         self.ntrain = self.ntrain_full - self.nvalid
 
-        self.train_data_full = TensorDataset(self.X_train_full,
-                                             self.Y_ph_train_full)
+        self.train_data_full = torch.utils.data.TensorDataset(
+            self.X_train_full,
+            self.Y_ph_train_full,
+        )
 
         self.train_data, self.valid_data = torch.utils.data.random_split(
-            self.train_data_full, [self.ntrain, self.nvalid])
-        self.trainloader = DataLoader(self.train_data,
-                                      batch_size=self.batch_size,
-                                      shuffle=True,
-                                      num_workers=4)
+            self.train_data_full,
+            [self.ntrain, self.nvalid],
+        )
+        self.trainloader = torch.utils.data.DataLoader(
+            self.train_data,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=4,
+            drop_last=False,
+        )
 
-        self.validloader = DataLoader(self.valid_data,
-                                      batch_size=self.batch_size,
-                                      shuffle=True,
-                                      num_workers=4)
+        self.validloader = torch.utils.data.DataLoader(
+            self.valid_data,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=4,
+            drop_last=False,
+        )
 
-        # Final batch will be less than batch size
-        self.iters_per_epoch = int(
-            np.floor((self.ntrain) / self.batch_size) + 1)
+        self.iters_per_epoch = self.ntrain // self.batch_size + (
+            self.ntrain % self.batch_size > 0)
 
     def setOptimizationParams(
         self,
@@ -192,7 +205,6 @@ class Trainer():
         min_lr: float = 1e-4,
     ):
         logger.info("Setting optimization parameters...")
-        #Optimizer details
 
         #Paper recommends 2-10 number of iterations
         self.epochs_per_half_cycle = epochs_per_half_cycle
