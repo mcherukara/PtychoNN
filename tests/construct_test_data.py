@@ -4,9 +4,12 @@ import numpy as np
 import tike.ptycho
 import tike.ptycho.learn
 
-def test_construct_simulated_training_set(W=1024, N=200, S=64):
-    fov = libimage.load('coins', W) * np.exp(1j * libimage.load('earring', W))
+def test_construct_simulated_training_set(W=2048, N=500, S=64):
+    phase = libimage.load('coins', W)
+    amplitude = 1 - libimage.load('earring', W)
+    fov = amplitude * np.exp(1j * phase * np.pi)
     assert np.abs(fov).max() <= 1.0
+    assert np.abs(fov).min() >= 0.0
     scan = np.random.uniform(1, W-S-1, (N, 2))
     probe = 1000 * (tike.ptycho.probe.gaussian(S)[None, None, None, ...]).astype('complex64')
 
