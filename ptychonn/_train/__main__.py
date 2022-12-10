@@ -52,11 +52,11 @@ def train_cli(
     out_dir: pathlib.Path,
 ):
     """Train a model from diffraction patterns and reconstructed patches."""
-    logging.basicConfig(
-        level=logging.INFO,
-    )
+    logging.basicConfig(level=logging.INFO, )
     data = np.load(data_path).astype('float32')
-    patches = np.load(patch_path).astype('float32')
+    patches = np.angle(np.load(patch_path)).astype('float32')
+    patches -= np.mean(patches)
+    data /= data.max()
     train(
         X_train=data,
         Y_train=patches,
@@ -68,7 +68,7 @@ def train_cli(
 
 def train(
     X_train: npt.NDArray[np.float],
-    Y_train: npt.NDArray[np.complex],
+    Y_train: npt.NDArray[np.float],
     iteration_out_path: pathlib.Path,
     load_model_path: pathlib.Path | None = None,
     epochs: int = 1,
