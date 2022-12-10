@@ -264,8 +264,9 @@ class Trainer():
 
         self.model = self.model.to(self.device)
 
-        logger.info("Setting up mixed precision gradient calculation...")
-        self.scaler = torch.cuda.amp.GradScaler()
+        # NOTE: @carterbox 12/2022 Disabling mixed-precision due to NaNs
+        # logger.info("Setting up mixed precision gradient calculation...")
+        # self.scaler = torch.cuda.amp.GradScaler()
 
         logger.info("Setting up metrics...")
         self.metrics = {
@@ -294,8 +295,8 @@ class Trainer():
 
             #Zero current grads and do backprop
             self.optimizer.zero_grad()
-            self.scaler.scale(loss).backward()
-            self.scaler.step(self.optimizer)
+            # self.scaler.scale(loss).backward()
+            # self.scaler.step(self.optimizer)
 
             tot_loss += loss.detach().item()
 
@@ -305,7 +306,7 @@ class Trainer():
             self.optimizer.step()
             self.scheduler.step()
             self.metrics['lrs'].append(self.scheduler.get_last_lr())
-            self.scaler.update()
+            # self.scaler.update()
 
         #Divide cumulative loss by number of batches-- sli inaccurate because last batch is different size
         self.metrics['losses'].append([tot_loss, loss_ph])
