@@ -89,24 +89,31 @@ def train(
     load_model_path
         Load a previous model but don't overwrite.
     """
+    assert Y_train.dtype == np.float32
+    assert np.all(np.isfinite(Y_train))
+    assert X_train.dtype == np.float32
+    assert np.all(np.isfinite(X_train))
     logger.info("Creating the training model...")
-    recon_model = ptychonn.model.ReconSmallPhaseModel()
-    if load_model_path is not None:
-        logger.info(
-            "Loading previous best model to initialize the training model.")
-        recon_model.load_state_dict(torch.load(load_model_path))
 
     trainer = Trainer(
-        recon_model,
+        model=ptychonn.model.ReconSmallPhaseModel(),
         batch_size=batch_size * torch.cuda.device_count(),
         output_path=iteration_out_path,
         output_suffix='',
     )
 
-    trainer.setTrainingData(X_train, Y_train)
+    trainer.setTrainingData(
+        X_train,
+        Y_train,
+        valid_data_ratio=0.1,
+    )
 
-    trainer.setOptimizationParams()
-    trainer.initModel()
+    trainer.setOptimizationParams(
+        epochs_per_half_cycle=6,
+        max_lr=5e-4,
+        min_lr=1e-4,
+    )
+    trainer.initModel(model_params_path=load_model_path, )
 
     trainer.run(epochs)
 
