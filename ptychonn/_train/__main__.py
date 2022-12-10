@@ -341,12 +341,16 @@ class Trainer():
 
     @staticmethod
     def customLoss(
-        t1,
-        t2,
+        input,
+        target,
         scaling,
     ):
-        return torch.sum(torch.mean(torch.abs(t1 - t2),
-                                    axis=(-1, -2))) / scaling
+        assert torch.all(torch.isfinite(input))
+        assert torch.all(torch.isfinite(target))
+        return torch.sum(torch.mean(
+            torch.abs(input - target),
+            axis=(-1, -2),
+        )) / scaling
 
     @staticmethod
     #Function to update saved model if validation loss is minimum
