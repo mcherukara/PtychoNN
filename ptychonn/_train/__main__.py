@@ -387,15 +387,16 @@ class Trainer():
 
             #Validation loop
             self.validate()
+
             if epoch % output_frequency == 0:
                 logger.info(
-                    'Epoch: %d | FT  | Train Loss: %.5f | Val Loss: %.5f',
+                    'Epoch: %d | FT  | Train Loss: %1.03e | Val Loss: %1.03e',
                     epoch,
                     self.metrics['losses'][-1][0],
                     self.metrics['val_losses'][-1][0],
                 )
                 logger.info(
-                    'Epoch: %d | Ph  | Train Loss: %.3f | Val Loss: %.3f',
+                    'Epoch: %d | Ph  | Train Loss: %1.03e | Val Loss: %1.03e',
                     epoch,
                     self.metrics['losses'][-1][1],
                     self.metrics['val_losses'][-1][1],
