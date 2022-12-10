@@ -221,28 +221,31 @@ class Trainer():
 
         #criterion = lambda t1, t2: nn.L1Loss()
         self.criterion = self.customLoss
-        self.optimizer = torch.optim.Adam(self.model.parameters(),
-                                          lr=self.max_lr)
+        self.optimizer = torch.optim.Adam(
+            self.model.parameters(),
+            lr=self.max_lr,
+        )
         self.scheduler = torch.optim.lr_scheduler.CyclicLR(
             self.optimizer,
             max_lr=self.max_lr,
             base_lr=self.min_lr,
             step_size_up=self.iters_per_half_cycle,
             cycle_momentum=False,
-            mode='triangular2')
+            mode='triangular2',
+        )
 
-    def testForwardSingleBatch(self):
-        for ft_images, phs in self.trainloader:
-            logger.info("batch size:", ft_images.shape)
-            ph_train = self.model(ft_images)
-            logger.info("Phase batch shape: ", ph_train.shape)
-            logger.info("Phase batch dtype", ph_train.dtype)
+    # def testForwardSingleBatch(self):
+    #     for ft_images, phs in self.trainloader:
+    #         logger.info("batch size:", ft_images.shape)
+    #         ph_train = self.model(ft_images)
+    #         logger.info("Phase batch shape: ", ph_train.shape)
+    #         logger.info("Phase batch dtype", ph_train.dtype)
 
-            loss_ph = self.criterion(ph_train, phs, self.ntrain)
-            logger.info("Phase loss", loss_ph)
-            break
+    #         loss_ph = self.criterion(ph_train, phs, self.ntrain)
+    #         logger.info("Phase loss", loss_ph)
+    #         break
 
-    def initModel(self, model_params_path: pathlib.Path|None = None):
+    def initModel(self, model_params_path: pathlib.Path | None = None):
 
         self.model_params_path = model_params_path
         if model_params_path is not None:
@@ -255,7 +258,9 @@ class Trainer():
             logger.info("Let's use %d GPUs!", torch.cuda.device_count())
             # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
             self.model = torch.nn.DataParallel(
-                self.model)  #Default all devices
+                self.model,
+                device_ids=None,  # Default all devices
+            )
 
         self.model = self.model.to(self.device)
 
@@ -308,7 +313,7 @@ class Trainer():
     def validate(self):
         tot_val_loss = 0.0
         val_loss_ph = 0.0
-        for j, (ft_images, phs) in enumerate(self.validloader):
+        for (ft_images, phs) in self.validloader:
             ft_images = ft_images.to(self.device)
             phs = phs.to(self.device)
             pred_phs = self.model(ft_images)  #Forward pass
@@ -327,8 +332,8 @@ class Trainer():
         self.metrics['val_losses'].append([tot_val_loss, val_loss_ph])
 
         self.saveMetrics(self.metrics, self.output_path, self.output_suffix)
-        #Update saved model if val loss is lower
 
+        # Update saved model if val loss is lower
         if (tot_val_loss < self.metrics['best_val_loss']):
             logger.info(
                 "Saving improved model after Val Loss improved from %.5f to %.5f",
