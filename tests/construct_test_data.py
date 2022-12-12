@@ -11,7 +11,7 @@ def test_construct_simulated_training_set(W=2048, N=500, S=64):
     assert np.abs(fov).max() <= 1.0
     assert np.abs(fov).min() >= 0.0
     scan = np.random.uniform(1, W-S-1, (N, 2))
-    probe = 1000 * (tike.ptycho.probe.gaussian(S)[None, None, None, ...]).astype('complex64')
+    probe = (tike.ptycho.probe.gaussian(S)[None, None, None, ...]).astype('complex64')
 
     patches = tike.ptycho.learn.extract_patches(
         psi=fov,
@@ -29,7 +29,7 @@ def test_construct_simulated_training_set(W=2048, N=500, S=64):
     ), axes=(-2, -1),).astype('float32')
     print(diffraction.dtype, diffraction.shape)
     np.save('diffraction', diffraction)
-    tifffile.imwrite('diffraction.tiff', diffraction[N//2])
+    tifffile.imwrite('diffraction.tiff', np.log10(diffraction[N//2]))
 
     print(f'Training params = {np.prod(diffraction.shape)}')
 
