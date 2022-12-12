@@ -25,8 +25,6 @@ logger = logging.getLogger(__name__)
         readable=True,
         path_type=pathlib.Path,
     ),
-    help=('A folder of NPZ files; '
-          'each has diffraction data and reconstructed patches.'),
 )
 @click.argument(
     'out_dir',
@@ -37,7 +35,6 @@ logger = logging.getLogger(__name__)
         file_okay=False,
         path_type=pathlib.Path,
     ),
-    help='A folder in which to dump all of the training outputs.',
 )
 def train_cli(
     data_dir: pathlib.Path,
@@ -45,11 +42,12 @@ def train_cli(
 ):
     """Train a model from diffraction patterns and reconstructed patches.
 
-    Expects a folder of NPZ files. Each contains two parameters: `reciprocal`
-    and `real` which are the diffraction patterns and reconstructed
-    (complex-valued) patches. The shapes of these two arrays match. The data
-    from every file in the folder will be concatinated into one
-    training/validation set.
+    Expects a `DATA_DIR` of NPZ files. Each contains two parameters:
+    `reciprocal` and `real` which are the diffraction patterns and
+    reconstructed (complex-valued) patches. The shapes of these two arrays
+    match. The data from every file in the folder will be concatinated into one
+    training/validation set. All the training artifacts are saved into
+    `OUT_DIR`.
     """
     logging.basicConfig(level=logging.INFO, )
 
