@@ -264,9 +264,7 @@ class Trainer():
 
         self.model = self.model.to(self.device)
 
-        # NOTE: @carterbox 12/2022 Disabling mixed-precision due to NaNs
-        # logger.info("Setting up mixed precision gradient calculation...")
-        # self.scaler = torch.cuda.amp.GradScaler()
+        self.scaler = torch.cuda.amp.GradScaler()
 
         logger.info("Setting up metrics...")
         self.metrics = {
@@ -281,34 +279,36 @@ class Trainer():
         tot_loss = 0.0
         loss_ph = 0.0
 
-        for i, (ft_images, phs) in enumerate(self.trainloader):
-            ft_images = ft_images.to(self.device)  #Move everything to device
+        for (ft_images, phs) in self.trainloader:
+
+            # Move everything to device
+            ft_images = ft_images.to(self.device)
             phs = phs.to(self.device)
 
-            pred_phs = self.model(ft_images)  #Forward pass
+            # Divide cumulative loss by number of batches-- slightly inaccurate
+            # because last batch is different size
+            pred_phs = self.model(ft_images)
+            loss_p = self.criterion(pred_phs, phs, self.ntrain)
+            # Monitor phase loss but only within support (which may not be same
+            # as true amp)
+            loss = loss_p
+            # Use equiweighted amps and phase
 
-            #Compute losses
-            loss_p = self.criterion(
-                pred_phs, phs, self.ntrain
-            )  #Monitor phase loss but only within support (which may not be same as true amp)
-            loss = loss_p  #Use equiweighted amps and phase
-
-            #Zero current grads and do backprop
+            # Zero current grads and do backprop
             self.optimizer.zero_grad()
-            # self.scaler.scale(loss).backward()
-            # self.scaler.step(self.optimizer)
+            self.scaler.scale(loss).backward()
+            self.scaler.step(self.optimizer)
 
             tot_loss += loss.detach().item()
 
             loss_ph += loss_p.detach().item()
 
-            #Update the LR according to the schedule -- CyclicLR updates each batch
-            self.optimizer.step()
+            # Update the LR according to the schedule -- CyclicLR updates each
+            # batch
             self.scheduler.step()
             self.metrics['lrs'].append(self.scheduler.get_last_lr())
-            # self.scaler.update()
+            self.scaler.update()
 
-        #Divide cumulative loss by number of batches-- sli inaccurate because last batch is different size
         self.metrics['losses'].append([tot_loss, loss_ph])
 
     def validate(self):
