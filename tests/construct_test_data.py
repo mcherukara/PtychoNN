@@ -5,7 +5,7 @@ import tike.ptycho
 import tike.ptycho.learn
 
 
-def test_construct_simulated_training_set(W=2048, N=500, S=64):
+def test_construct_simulated_training_set(W=2048, N=1024, S=128):
     phase = libimage.load('coins', W) - 0.5
     amplitude = 1 - libimage.load('earring', W)
     fov = (amplitude * np.exp(1j * phase * np.pi)).astype('complex64')
@@ -25,7 +25,6 @@ def test_construct_simulated_training_set(W=2048, N=500, S=64):
         patch_width=probe.shape[-1],
     ).astype('complex64')
     print(patches.dtype, patches.shape)
-    np.save('patches', patches)
 
     diffraction = np.fft.ifftshift(
         tike.ptycho.simulate(
@@ -37,11 +36,15 @@ def test_construct_simulated_training_set(W=2048, N=500, S=64):
         axes=(-2, -1),
     ).astype('float32')
     print(diffraction.dtype, diffraction.shape)
-    np.save('diffraction', diffraction)
-    tifffile.imwrite('diffraction.tiff', np.log10(diffraction[N // 2]))
+    tifffile.imwrite('diffraction.tiff', diffraction[N // 2])
 
     print(f'Training params = {np.prod(diffraction.shape)}')
 
+    np.savez_compressed(
+        'simulated_data.npz',
+        reciprocal=diffraction,
+        real=patches,
+    )
 
 if __name__ == '__main__':
     test_construct_simulated_training_set()
