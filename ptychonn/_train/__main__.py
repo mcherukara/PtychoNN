@@ -2,7 +2,6 @@ import logging
 import os
 import pathlib
 
-from torch.utils.data import TensorDataset, DataLoader
 import click
 import numpy as np
 import numpy.typing as npt
@@ -131,7 +130,6 @@ def train(
 class Trainer():
     '''
     '''
-
     def __init__(
         self,
         model: ptychonn.model.ReconSmallPhaseModel,
@@ -190,7 +188,7 @@ class Trainer():
         self.validloader = torch.utils.data.DataLoader(
             self.valid_data,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=False,
             num_workers=4,
             drop_last=False,
         )
@@ -347,9 +345,9 @@ class Trainer():
 
     @staticmethod
     def customLoss(
-        input,
-        target,
-        scaling,
+        input: torch.tensor,
+        target: torch.tensor,
+        scaling: float,
     ):
         assert torch.all(torch.isfinite(input))
         assert torch.all(torch.isfinite(target))
@@ -359,12 +357,12 @@ class Trainer():
         )) / scaling
 
     @staticmethod
-    #Function to update saved model if validation loss is minimum
     def updateSavedModel(
         model: ptychonn.model.ReconSmallPhaseModel,
         path: pathlib.Path,
         output_suffix: str = '',
     ):
+        """Update saved model if validation loss is minimum."""
         if not os.path.isdir(path):
             os.mkdir(path)
         fname = path / ('best_model' + output_suffix + '.pth')
@@ -408,7 +406,7 @@ class Trainer():
                     self.metrics['val_losses'][-1][1],
                 )
                 logger.info(
-                    'Epoch: %d | Ending LR: %.6f ',
+                    'Epoch: %d | Ending LR: %1.03e',
                     epoch,
                     self.metrics['lrs'][-1][0],
                 )
