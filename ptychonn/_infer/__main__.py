@@ -195,7 +195,6 @@ def infer(
 class Tester():
     '''
     '''
-
     def __init__(
         self,
         *,
