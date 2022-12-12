@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 import pathlib
@@ -16,24 +17,16 @@ logger = logging.getLogger(__name__)
 
 @click.command(name='train')
 @click.argument(
-    'data_path',
+    'data_dir',
     type=click.Path(
         exists=True,
-        file_okay=True,
-        dir_okay=False,
+        file_okay=False,
+        dir_okay=True,
         readable=True,
         path_type=pathlib.Path,
     ),
-)
-@click.argument(
-    'patch_path',
-    type=click.Path(
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        readable=True,
-        path_type=pathlib.Path,
-    ),
+    help=('A folder of NPZ files; '
+          'each has diffraction data and reconstructed patches.'),
 )
 @click.argument(
     'out_dir',
@@ -44,23 +37,50 @@ logger = logging.getLogger(__name__)
         file_okay=False,
         path_type=pathlib.Path,
     ),
+    help='A folder in which to dump all of the training outputs.',
 )
 def train_cli(
-    data_path: pathlib.Path,
-    patch_path: pathlib.Path,
+    data_dir: pathlib.Path,
     out_dir: pathlib.Path,
 ):
-    """Train a model from diffraction patterns and reconstructed patches."""
+    """Train a model from diffraction patterns and reconstructed patches.
+
+    Expects a folder of NPZ files. Each contains two parameters: `reciprocal`
+    and `real` which are the diffraction patterns and reconstructed
+    (complex-valued) patches. The shapes of these two arrays match. The data
+    from every file in the folder will be concatinated into one
+    training/validation set.
+    """
     logging.basicConfig(level=logging.INFO, )
-    data = np.load(data_path).astype('float32')
-    patches = np.angle(np.load(patch_path)).astype('float32')
-    patches -= np.mean(patches)
-    data /= data.max()
+
+    dataslist = []
+    patchlist = []
+
+    for name in glob.glob(str(data_dir / '*.npz')):
+        print(name)
+        with np.load(name) as f:
+            dataslist.append(f['reciprocal'])
+            patchlist.append(f['real'])
+
+    data = np.concatenate(dataslist, axis=0)
+    patches = np.concatenate(patchlist, axis=0)
+
+    # NOTE: @carterbox AFAIK, the only preprocessing of the training data is a
+    # centering of the phase in the center 3rd of the reconstructed patches.
+    # The diffraction patterns are converted to float32 and otherwise
+    # unaltered.
+    patches = np.angle(patches).astype('float32')
+    patches -= np.mean(
+        patches[..., patches.shape[-2] // 3:-patches.shape[-2] // 3,
+                patches.shape[-1] // 3:-patches.shape[-1] // 3], )
+
+    os.makedirs(out_dir, exist_ok=True)
+
     train(
         X_train=data,
         Y_train=patches,
-        iteration_out_path=out_dir,
-        epochs=100,
+        out_dir=out_dir,
+        epochs=50,
         batch_size=64,
     )
 
@@ -68,7 +88,7 @@ def train_cli(
 def train(
     X_train: npt.NDArray[np.float],
     Y_train: npt.NDArray[np.float],
-    iteration_out_path: pathlib.Path,
+    out_dir: pathlib.Path,
     load_model_path: pathlib.Path | None = None,
     epochs: int = 1,
     batch_size: int = 64,
@@ -81,12 +101,10 @@ def train(
         The diffraction patterns.
     Y_train (N, WIDTH, HEIGHT)
         The corresponding reconstructed patches for the diffraction patterns.
-    best_model_params_path
-        Where you want to save the trained model. Will be overwritten.
-    iteration_out_path
-        ?
+    out_dir
+        A folder where all the training artifacts are saved.
     load_model_path
-        Load a previous model but don't overwrite.
+        Load a previous model's parameters from this file.
     """
     assert Y_train.dtype == np.float32
     assert np.all(np.isfinite(Y_train))
@@ -97,39 +115,37 @@ def train(
     trainer = Trainer(
         model=ptychonn.model.ReconSmallPhaseModel(),
         batch_size=batch_size * torch.cuda.device_count(),
-        output_path=iteration_out_path,
+        output_path=out_dir,
         output_suffix='',
     )
-
     trainer.setTrainingData(
         X_train,
         Y_train,
         valid_data_ratio=0.1,
     )
-
     trainer.setOptimizationParams(
         epochs_per_half_cycle=6,
-        max_lr=5e-4,
+        max_lr=1e-3,
         min_lr=1e-4,
     )
     trainer.initModel(model_params_path=load_model_path, )
-
     trainer.run(epochs)
 
     trainer.plotLearningRate(
-        save_fname=iteration_out_path / 'learning_rate.svg',
+        save_fname=out_dir / 'learning_rate.svg',
         show_fig=False,
     )
     ptychonn.plot.plot_metrics(
         trainer.metrics,
-        save_fname=iteration_out_path / 'metrics.svg',
+        save_fname=out_dir / 'metrics.svg',
         show_fig=False,
     )
 
 
 class Trainer():
-    '''
-    '''
+    """A object that manages training PtychoNN
+    """
+
     def __init__(
         self,
         model: ptychonn.model.ReconSmallPhaseModel,
@@ -204,7 +220,9 @@ class Trainer():
     ):
         logger.info("Setting optimization parameters...")
 
-        #Paper recommends 2-10 number of iterations
+        # TODO: Move this note about iterations into the documentation string
+        # after figuring out what it means. Paper recommends 2-10 number of
+        # iterations
         self.epochs_per_half_cycle = epochs_per_half_cycle
         self.iters_per_half_cycle = epochs_per_half_cycle * self.iters_per_epoch
 
@@ -217,7 +235,6 @@ class Trainer():
         self.max_lr = max_lr
         self.min_lr = min_lr
 
-        #criterion = lambda t1, t2: nn.L1Loss()
         self.criterion = self.customLoss
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),
@@ -232,18 +249,8 @@ class Trainer():
             mode='triangular2',
         )
 
-    # def testForwardSingleBatch(self):
-    #     for ft_images, phs in self.trainloader:
-    #         logger.info("batch size:", ft_images.shape)
-    #         ph_train = self.model(ft_images)
-    #         logger.info("Phase batch shape: ", ph_train.shape)
-    #         logger.info("Phase batch dtype", ph_train.dtype)
-
-    #         loss_ph = self.criterion(ph_train, phs, self.ntrain)
-    #         logger.info("Phase loss", loss_ph)
-    #         break
-
     def initModel(self, model_params_path: pathlib.Path | None = None):
+        """Load parameters from the disk then model to the GPU(s)."""
 
         self.model_params_path = model_params_path
         if model_params_path is not None:
@@ -309,21 +316,16 @@ class Trainer():
 
         self.metrics['losses'].append([tot_loss, loss_ph])
 
-    def validate(self):
+    def validate(self, epoch: int):
         tot_val_loss = 0.0
         val_loss_ph = 0.0
         for (ft_images, phs) in self.validloader:
             ft_images = ft_images.to(self.device)
             phs = phs.to(self.device)
-            pred_phs = self.model(ft_images)  #Forward pass
+            pred_phs = self.model(ft_images)
 
             val_loss_p = self.criterion(pred_phs, phs, self.nvalid)
             val_loss = val_loss_p
-
-            #try complex valued diff
-            #diff_real = pred_amps * torch.cos(pred_phs) - amps * torch.cos(phs)
-            #diff_imag = pred_amps * torch.sin(pred_phs) - amps * torch.sin(phs)
-            #val_loss = torch.mean(torch.abs(diff_real + diff_imag))
 
             tot_val_loss += val_loss.detach().item()
             val_loss_ph += val_loss_p.detach().item()
@@ -343,18 +345,31 @@ class Trainer():
             self.updateSavedModel(self.model, self.output_path,
                                   self.output_suffix)
 
+            import tifffile
+            os.makedirs(self.output_path / 'reference', exist_ok=True)
+            os.makedirs(self.output_path / 'inference', exist_ok=True)
+            tifffile.imwrite(
+                self.output_path / f'reference/{epoch:05d}.tiff',
+                phs[0, 0].detach().cpu().numpy().astype(np.float32))
+            tifffile.imwrite(
+                self.output_path / f'inference/{epoch:05d}.tiff',
+                pred_phs[0, 0].detach().cpu().numpy().astype(np.float32))
+
     @staticmethod
     def customLoss(
         input: torch.tensor,
         target: torch.tensor,
         scaling: float,
     ):
+        """A loss function which scales according to training set size."""
         assert torch.all(torch.isfinite(input))
         assert torch.all(torch.isfinite(target))
         return torch.sum(torch.mean(
             torch.abs(input - target),
             axis=(-1, -2),
         )) / scaling
+
+    # TODO: Use a callback instead of a static method for saving the model?
 
     @staticmethod
     def updateSavedModel(
@@ -378,6 +393,8 @@ class Trainer():
         np.savez(path / ('metrics' + output_suffix + '.npz'), **metrics)
 
     def run(self, epochs: int, output_frequency: int = 1):
+        """The main training loop"""
+
         for epoch in range(epochs):
 
             #Set model to train mode
@@ -390,7 +407,7 @@ class Trainer():
             self.model.eval()
 
             #Validation loop
-            self.validate()
+            self.validate(epoch)
 
             if epoch % output_frequency == 0:
                 logger.info(
