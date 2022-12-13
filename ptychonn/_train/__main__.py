@@ -86,7 +86,7 @@ def train_cli(
 def train(
     X_train: npt.NDArray[np.float],
     Y_train: npt.NDArray[np.float],
-    out_dir: pathlib.Path,
+    out_dir: pathlib.Path | None,
     load_model_path: pathlib.Path | None = None,
     epochs: int = 1,
     batch_size: int = 64,
@@ -114,7 +114,6 @@ def train(
         model=ptychonn.model.ReconSmallPhaseModel(),
         batch_size=batch_size * torch.cuda.device_count(),
         output_path=out_dir,
-        output_suffix='',
     )
     trainer.setTrainingData(
         X_train,
@@ -126,30 +125,32 @@ def train(
         max_lr=1e-3,
         min_lr=1e-4,
     )
-    trainer.initModel(model_params_path=load_model_path, )
+    trainer.initModel(model_params_path=load_model_path)
     trainer.run(epochs)
 
-    trainer.plotLearningRate(
-        save_fname=out_dir / 'learning_rate.svg',
-        show_fig=False,
-    )
-    ptychonn.plot.plot_metrics(
-        trainer.metrics,
-        save_fname=out_dir / 'metrics.svg',
-        show_fig=False,
-    )
+    if out_dir is not None:
+        trainer.plotLearningRate(
+            save_fname=out_dir / 'learning_rate.svg',
+            show_fig=False,
+        )
+        ptychonn.plot.plot_metrics(
+            trainer.metrics,
+            save_fname=out_dir / 'metrics.svg',
+            show_fig=False,
+        )
+
+    return trainer
 
 
 class Trainer():
-    """A object that manages training PtychoNN
-    """
+    """A object that manages training PtychoNN"""
 
     def __init__(
         self,
         model: ptychonn.model.ReconSmallPhaseModel,
         batch_size: int,
-        output_path: pathlib.Path,
-        output_suffix: str,
+        output_path: pathlib.Path | None = None,
+        output_suffix: str = '',
     ):
         logger.info("Initializing the training procedure...")
         self.model = model
@@ -330,7 +331,12 @@ class Trainer():
 
         self.metrics['val_losses'].append([tot_val_loss, val_loss_ph])
 
-        self.saveMetrics(self.metrics, self.output_path, self.output_suffix)
+        if self.output_path is not None:
+            self.saveMetrics(
+                self.metrics,
+                self.output_path,
+                self.output_suffix,
+            )
 
         # Update saved model if val loss is lower
         if (tot_val_loss < self.metrics['best_val_loss']):
@@ -340,18 +346,23 @@ class Trainer():
                 tot_val_loss,
             )
             self.metrics['best_val_loss'] = tot_val_loss
-            self.updateSavedModel(self.model, self.output_path,
-                                  self.output_suffix)
 
-            import tifffile
-            os.makedirs(self.output_path / 'reference', exist_ok=True)
-            os.makedirs(self.output_path / 'inference', exist_ok=True)
-            tifffile.imwrite(
-                self.output_path / f'reference/{epoch:05d}.tiff',
-                phs[0, 0].detach().cpu().numpy().astype(np.float32))
-            tifffile.imwrite(
-                self.output_path / f'inference/{epoch:05d}.tiff',
-                pred_phs[0, 0].detach().cpu().numpy().astype(np.float32))
+            if self.output_path is not None:
+                self.updateSavedModel(
+                    self.model,
+                    self.output_path,
+                    self.output_suffix,
+                )
+
+                import tifffile
+                os.makedirs(self.output_path / 'reference', exist_ok=True)
+                os.makedirs(self.output_path / 'inference', exist_ok=True)
+                tifffile.imwrite(
+                    self.output_path / f'reference/{epoch:05d}.tiff',
+                    phs[0, 0].detach().cpu().numpy().astype(np.float32))
+                tifffile.imwrite(
+                    self.output_path / f'inference/{epoch:05d}.tiff',
+                    pred_phs[0, 0].detach().cpu().numpy().astype(np.float32))
 
     @staticmethod
     def customLoss(
@@ -372,23 +383,30 @@ class Trainer():
     @staticmethod
     def updateSavedModel(
         model: ptychonn.model.ReconSmallPhaseModel,
-        path: pathlib.Path,
-        output_suffix: str = '',
+        directory: pathlib.Path,
+        suffix: str = '',
     ):
-        """Update saved model if validation loss is minimum."""
-        if not os.path.isdir(path):
-            os.mkdir(path)
-        fname = path / ('best_model' + output_suffix + '.pth')
+        """Writes `model` parameters to `directory`/best_model`suffix`.pth
+
+        The directory is created if it does not exist.
+        """
+        fname = directory / f'best_model{ suffix }.pth'
         logger.info("Saving best model as %s", fname)
+        os.makedirs(directory, exist_ok=True)
         torch.save(model.state_dict(), fname)
 
     @staticmethod
     def saveMetrics(
         metrics: dict,
-        path: pathlib.Path,
-        output_suffix: str = '',
+        directory: pathlib.Path,
+        suffix: str = '',
     ):
-        np.savez(path / ('metrics' + output_suffix + '.npz'), **metrics)
+        """Writes `metrics` to `directory`/metrics`suffix`.npz
+
+        The directory is created if it does not exist.
+        """
+        os.makedirs(directory, exist_ok=True)
+        np.savez(directory / f'metrics{suffix}.npz', **metrics)
 
     def run(self, epochs: int, output_frequency: int = 1):
         """The main training loop"""
