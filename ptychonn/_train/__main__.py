@@ -416,6 +416,12 @@ class Trainer():
         os.makedirs(directory, exist_ok=True)
         torch.save(model.state_dict(), fname)
 
+    def getSavedModelPath(self) -> pathlib.Path | None:
+        """Return the path where `validate` will save the model weights"""
+        if self.output_path is None:
+            return None
+        return self.output_path / f'best_model{ self.output_suffix }.pth'
+
     @staticmethod
     def saveMetrics(
         metrics: dict,
