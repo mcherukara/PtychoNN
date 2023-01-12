@@ -143,7 +143,28 @@ def train(
 
 
 class Trainer():
-    """A object that manages training PtychoNN"""
+    """A object that manages training PtychoNN
+
+    Artifacts
+    ---------
+
+    When `output_path` is not None, the following artifacts are written to disk.
+
+    ```
+        `output_path`
+            reference
+                00000.tiff
+                00001.tiff
+                ...
+            inference
+                00000.tiff
+                00001.tiff
+                ...
+            metrics`output_suffix`.npz
+            best_model`output_suffix`.pth
+    ```
+
+    """
 
     def __init__(
         self,
