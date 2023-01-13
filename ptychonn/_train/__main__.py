@@ -84,8 +84,8 @@ def train_cli(
 
 
 def train(
-    X_train: npt.NDArray[np.float],
-    Y_train: npt.NDArray[np.float],
+    X_train: npt.NDArray[float],
+    Y_train: npt.NDArray[float],
     out_dir: pathlib.Path | None,
     load_model_path: pathlib.Path | None = None,
     epochs: int = 1,
