@@ -7,4 +7,6 @@ numpy ~=1.21
 pytorch ~=1.12
 scikit-image
 scipy
+tifffile
 tqdm
+torchinfo
