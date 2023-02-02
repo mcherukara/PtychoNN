@@ -18,7 +18,7 @@ class ReconSmallPhaseModel(nn.Module):
         )
 
         # amplitude model
-        #self.decoder_amplitude = nn.Sequential(
+        #self.decoder1 = nn.Sequential(
         #    *self.up_block(self.nconv * 8, self.nconv * 8),
         #    *self.up_block(self.nconv * 8, self.nconv * 4),
         #    *self.up_block(self.nconv * 4, self.nconv * 2),
@@ -27,13 +27,13 @@ class ReconSmallPhaseModel(nn.Module):
         #)
 
         # phase model
-        self.decoder_phase = nn.Sequential(
+        self.decoder2 = nn.Sequential(
             *self.up_block(self.nconv * 8, self.nconv * 8),
             *self.up_block(self.nconv * 8, self.nconv * 4),
             *self.up_block(self.nconv * 4, self.nconv * 2),
             *self.up_block(self.nconv * 2, self.nconv * 1),
             nn.Conv2d(self.nconv * 1, 1, 3, stride=1, padding=(1, 1)),
-            nn.BatchNorm2d(1) if self.use_batch_norm else torch.nn.Identity(),
+            *((nn.BatchNorm2d(1),) if self.use_batch_norm else ()),
             nn.Tanh(),
         )
 
@@ -46,12 +46,10 @@ class ReconSmallPhaseModel(nn.Module):
                 stride=1,
                 padding=(1, 1),
             ),
-            nn.BatchNorm2d(filters_out)
-            if self.use_batch_norm else torch.nn.Identity(),
+            *((nn.BatchNorm2d(filters_out),) if self.use_batch_norm else ()),
             nn.ReLU(),
             nn.Conv2d(filters_out, filters_out, 3, stride=1, padding=(1, 1)),
-            nn.BatchNorm2d(filters_out)
-            if self.use_batch_norm else torch.nn.Identity(),
+            *((nn.BatchNorm2d(filters_out),) if self.use_batch_norm else ()),
             nn.ReLU(),
             nn.MaxPool2d((2, 2))
         ]
@@ -65,12 +63,10 @@ class ReconSmallPhaseModel(nn.Module):
                 stride=1,
                 padding=(1, 1),
             ),
-            nn.BatchNorm2d(filters_out)
-            if self.use_batch_norm else torch.nn.Identity(),
+            *((nn.BatchNorm2d(filters_out),) if self.use_batch_norm else ()),
             nn.ReLU(),
             nn.Conv2d(filters_out, filters_out, 3, stride=1, padding=(1, 1)),
-            nn.BatchNorm2d(filters_out)
-            if self.use_batch_norm else torch.nn.Identity(),
+            *((nn.BatchNorm2d(filters_out),) if self.use_batch_norm else ()),
             nn.ReLU(),
             nn.Upsample(scale_factor=2, mode='bilinear')
         ]
@@ -78,8 +74,8 @@ class ReconSmallPhaseModel(nn.Module):
     def forward(self, x):
         with torch.cuda.amp.autocast():
             x1 = self.encoder(x)
-            #amplitude = self.decoder_amplitude(x1)
-            phase = self.decoder_phase(x1)
+            #amplitude = self.decoder1(x1)
+            phase = self.decoder2(x1)
 
             #Restore -pi to pi range
             phase = phase * np.pi  #Using tanh activation (-1 to 1) for phase so multiply by pi
