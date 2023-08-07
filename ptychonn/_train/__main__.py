@@ -279,13 +279,10 @@ class Trainer():
 
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Let's use {torch.cuda.device_count()} GPUs!")
+
         if torch.cuda.device_count() > 1:
-            logger.info("Let's use %d GPUs!", torch.cuda.device_count())
-            # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-            self.model = torch.nn.DataParallel(
-                self.model,
-                device_ids=None,  # Default all devices
-            )
+            self.model = torch.nn.DataParallel(self.model)
 
         self.model = self.model.to(self.device)
 
@@ -414,7 +411,13 @@ class Trainer():
         fname = directory / f'best_model{ suffix }.pth'
         logger.info("Saving best model as %s", fname)
         os.makedirs(directory, exist_ok=True)
-        torch.save(model.state_dict(), fname)
+        if isinstance(model, (
+                torch.nn.DataParallel,
+                torch.nn.parallel.DistributedDataParallel,
+        )):
+            torch.save(model.module.state_dict(), fname)
+        else:
+            torch.save(model.state_dict(), fname)
 
     def getSavedModelPath(self) -> pathlib.Path | None:
         """Return the path where `validate` will save the model weights"""

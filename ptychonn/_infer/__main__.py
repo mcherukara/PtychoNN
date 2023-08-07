@@ -202,24 +202,25 @@ class Tester():
         model: typing.Optional[torch.nn.Module] = None,
         model_params_path: typing.Optional[pathlib.Path] = None,
     ):
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Let's use {torch.cuda.device_count()} GPUs!")
+        self.model = ptychonn.model.ReconSmallPhaseModel(
+        ) if model is None else model
 
-        if model is None or model_params_path is None:
-            self.model = ptychonn.model.ReconSmallPhaseModel()
+        if model_params_path is None:
             with importlib.resources.path(
                     'ptychonn._infer',
                     'weights.pth',
             ) as model_params_path:
-                self.model.load_state_dict(
-                    torch.load(model_params_path, map_location=self.device))
+                self.model.load_state_dict(torch.load(model_params_path))
         else:
-            self.model = model
-            self.model.load_state_dict(
-                torch.load(model_params_path, map_location=self.device))
+            self.model.load_state_dict(torch.load(model_params_path))
 
-        self.model = torch.nn.DataParallel(self.model)  #Default all devices
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Let's use {torch.cuda.device_count()} GPUs!")
+
+        if torch.cuda.device_count() > 1:
+            self.model = torch.nn.DataParallel(self.model)
+
         self.model = self.model.to(self.device)
 
     def setTestData(self, X_test: np.ndarray, batch_size: int):
