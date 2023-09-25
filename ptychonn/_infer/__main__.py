@@ -202,7 +202,7 @@ class Tester():
         model: typing.Optional[torch.nn.Module] = None,
         model_params_path: typing.Optional[pathlib.Path] = None,
     ):
-        self.model = ptychonn.model.ReconSmallPhaseModel(
+        self.model = ptychonn.model.ReconSmallModel(
         ) if model is None else model
 
         if model_params_path is None:

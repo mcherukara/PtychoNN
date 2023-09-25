@@ -67,10 +67,12 @@ def train_cli(
     # centering of the phase in the center 3rd of the reconstructed patches.
     # The diffraction patterns are converted to float32 and otherwise
     # unaltered.
-    patches = np.angle(patches).astype('float32')
-    patches -= np.mean(
-        patches[..., patches.shape[-2] // 3:-patches.shape[-2] // 3,
-                patches.shape[-1] // 3:-patches.shape[-1] // 3], )
+    phase = np.angle(patches).astype('float32')
+    phase -= np.mean(
+        phase[..., phase.shape[-2] // 3:-phase.shape[-2] // 3,
+                   phase.shape[-1] // 3:-phase.shape[-1] // 3], )
+    amplitude = np.abs(patches).astype('float32')
+    patches = np.stack((phase, amplitude), axis=1)
 
     os.makedirs(out_dir, exist_ok=True)
 
@@ -97,7 +99,7 @@ def train(
     ----------
     X_train (N, WIDTH, HEIGHT)
         The diffraction patterns.
-    Y_train (N, WIDTH, HEIGHT)
+    Y_train (N, 2, WIDTH, HEIGHT)
         The corresponding reconstructed patches for the diffraction patterns.
     out_dir
         A folder where all the training artifacts are saved.
@@ -111,7 +113,7 @@ def train(
     logger.info("Creating the training model...")
 
     trainer = Trainer(
-        model=ptychonn.model.ReconSmallPhaseModel(),
+        model=ptychonn.model.ReconSmallModel(),
         batch_size=batch_size * torch.cuda.device_count(),
         output_path=out_dir,
     )
@@ -168,7 +170,7 @@ class Trainer():
 
     def __init__(
         self,
-        model: ptychonn.model.ReconSmallPhaseModel,
+        model: ptychonn.model.ReconSmallModel,
         batch_size: int,
         output_path: pathlib.Path | None = None,
         output_suffix: str = '',
@@ -186,6 +188,22 @@ class Trainer():
         Y_ph_train_full: np.ndarray,
         valid_data_ratio: float = 0.1,
     ):
+        """
+
+        Parameters
+        ----------
+        X_train_full : (N, H, W)
+            The measured intensities at the detector
+        Y_ph_train_full : (N, C, H, W)
+            The phase and amplitude patches from the reconstructed object.
+            Phase in the zeroth channel and amplitude (optionally) in the first
+            channel
+
+        """
+        if (Y_ph_train_full.ndim != 4):
+            msg = ("Training data example patches must have a channel "
+                   "dimension! i.e. the shape should be (N, C, H, W)")
+            raise ValueError(msg)
         logger.info("Setting training data...")
 
         self.H, self.W = X_train_full.shape[-2:]
@@ -195,7 +213,7 @@ class Trainer():
             dtype=torch.float32,
         )
         self.Y_ph_train_full = torch.tensor(
-            Y_ph_train_full[:, None, ...],
+            Y_ph_train_full,
             dtype=torch.float32,
         )
         self.ntrain_full = self.X_train_full.shape[0]
@@ -278,11 +296,11 @@ class Trainer():
         torchinfo.summary(self.model, (1, 1, self.H, self.W), device="cpu")
 
         self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
+            "cuda:7" if torch.cuda.is_available() else "cpu")
         print(f"Let's use {torch.cuda.device_count()} GPUs!")
 
-        if torch.cuda.device_count() > 1:
-            self.model = torch.nn.DataParallel(self.model)
+        # if torch.cuda.device_count() > 1:
+        #     self.model = torch.nn.DataParallel(self.model)
 
         self.model = self.model.to(self.device)
 
@@ -400,7 +418,7 @@ class Trainer():
 
     @staticmethod
     def updateSavedModel(
-        model: ptychonn.model.ReconSmallPhaseModel,
+        model: ptychonn.model.ReconSmallModel,
         directory: pathlib.Path,
         suffix: str = '',
     ):
