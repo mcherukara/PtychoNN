@@ -19,23 +19,24 @@ class ReconSmallModel(nn.Module):
     enable_amplitude :
         Whether the amplitude branch is included in the model
 
+    Shapes
+    ------
+    input : (N, 1, H, W)
+        The measured intensity of the diffraction patterns
+    output : (N, C, H, W)
+        The phase (and amplitude if C is 2) in the patch of the object
     """
 
     def __init__(
         self,
         nconv: int = 16,
-        use_batch_norm: bool = False,
-        enable_phase: bool = True,
+        use_batch_norm: bool = True,
         enable_amplitude: bool = True,
     ):
-        super(ReconSmallPhaseModel, self).__init__()
+        super().__init__()
         self.nconv = nconv
         self.use_batch_norm = use_batch_norm
-        self.enable_phase = enable_phase
         self.enable_amplitude = enable_amplitude
-        if not (enable_phase or enable_amplitude):
-            msg = 'This module must reconstruct at least one of phase or amplitude.'
-            raise ValueError(msg)
 
         # Appears sequential has similar functionality as TF avoiding need for
         # separate model definition and activ
@@ -46,43 +47,25 @@ class ReconSmallModel(nn.Module):
             *self.down_block(self.nconv * 4, self.nconv * 8),
         )
 
-        # amplitude model
-        if enable_amplitude:
-            self.decoder1 = nn.Sequential(
-                *self.up_block(self.nconv * 8, self.nconv * 8),
-                *self.up_block(self.nconv * 8, self.nconv * 4),
-                *self.up_block(self.nconv * 4, self.nconv * 2),
-                *self.up_block(self.nconv * 2, self.nconv * 1),
-                nn.Conv2d(
-                    self.nconv * 1,
-                    1,
-                    3,
-                    stride=1,
-                    padding=(1, 1),
-                    bias=(not self.use_batch_norm),
-                ),
-                *((nn.BatchNorm2d(1), ) if self.use_batch_norm else ()),
-                nn.Sigmoid(),
-            )
-
-        # phase model
-        if enable_phase:
-            self.decoder2 = nn.Sequential(
-                *self.up_block(self.nconv * 8, self.nconv * 8),
-                *self.up_block(self.nconv * 8, self.nconv * 4),
-                *self.up_block(self.nconv * 4, self.nconv * 2),
-                *self.up_block(self.nconv * 2, self.nconv * 1),
-                nn.Conv2d(
-                    self.nconv * 1,
-                    1,
-                    3,
-                    stride=1,
-                    padding=(1, 1),
-                    bias=(not self.use_batch_norm),
-                ),
-                *((nn.BatchNorm2d(1), ) if self.use_batch_norm else ()),
-                nn.Tanh(),
-            )
+        # Double the number of channels when doing both phase and amplitude,
+        # but keep them separate with grouping
+        c = 2 if self.enable_amplitude else 1
+        self.decoder = nn.Sequential(
+            *self.up_block(self.nconv * 8 * 1, self.nconv * 8 * c, groups=c),
+            *self.up_block(self.nconv * 8 * c, self.nconv * 4 * c, groups=c),
+            *self.up_block(self.nconv * 4 * c, self.nconv * 2 * c, groups=c),
+            *self.up_block(self.nconv * 2 * c, self.nconv * 1 * c, groups=c),
+            nn.Conv2d(
+                self.nconv * 1 * c,
+                c,
+                3,
+                stride=1,
+                padding=(1, 1),
+                bias=(not self.use_batch_norm),
+                groups=c,
+            ),
+            *((nn.BatchNorm2d(c), ) if self.use_batch_norm else ()),
+        )
 
     def down_block(self, filters_in, filters_out):
         return [
@@ -109,7 +92,7 @@ class ReconSmallModel(nn.Module):
             nn.MaxPool2d((2, 2))
         ]
 
-    def up_block(self, filters_in, filters_out):
+    def up_block(self, filters_in, filters_out, groups):
         return [
             nn.Conv2d(
                 filters_in,
@@ -118,6 +101,7 @@ class ReconSmallModel(nn.Module):
                 stride=1,
                 padding=(1, 1),
                 bias=(not self.use_batch_norm),
+                groups=groups,
             ), *((nn.BatchNorm2d(filters_out), ) if self.use_batch_norm else
                  ()),
             nn.ReLU(),
@@ -128,6 +112,7 @@ class ReconSmallModel(nn.Module):
                 stride=1,
                 padding=(1, 1),
                 bias=(not self.use_batch_norm),
+                groups=groups,
             ), *((nn.BatchNorm2d(filters_out), ) if self.use_batch_norm else
                  ()),
             nn.ReLU(),
@@ -136,55 +121,11 @@ class ReconSmallModel(nn.Module):
 
     def forward(self, x):
         with torch.cuda.amp.autocast():
-            x1 = self.encoder(x)
-
+            output = self.decoder(self.encoder(x))
+            # Restore -pi to pi range
+            # Using tanh activation (-1 to 1) for phase so multiply by pi
+            output[..., 0, :, :] = torch.tanh(output[..., 0, :, :]) * np.pi
+            # Restrict amplitude to (0, 1) range with sigmoid
             if self.enable_amplitude:
-                amplitude = self.decoder1(x1)
-
-            if self.enable_phase:
-                phase = self.decoder2(x1)
-
-                # Restore -pi to pi range
-                # Using tanh activation (-1 to 1) for phase so multiply by pi
-                phase = phase * np.pi
-
-        if self.enable_amplitude and self.enable_phase:
-            return amplitude, phase
-
-        if self.enable_amplitude:
-            return amplitude
-
-        if self.enable_phase:
-            return phase
-
-
-class ReconSmallPhaseModel(ReconSmallModel):
-    """Alias for a phase-only ReconSmallModel."""
-
-    def __init__(
-        self,
-        nconv: int = 16,
-        use_batch_norm=False,
-    ) -> None:
-        super().__init__(
-            nconv=nconv,
-            use_batch_norm=use_batch_norm,
-            enable_phase=True,
-            enable_amplitude=False,
-        )
-
-
-class ReconSmallAmpliModel(ReconSmallModel):
-    """Alias for an amplitude-only ReconSmallModel."""
-
-    def __init__(
-        self,
-        nconv: int = 16,
-        use_batch_norm=False,
-    ) -> None:
-        super().__init__(
-            nconv=nconv,
-            use_batch_norm=use_batch_norm,
-            enable_amplitude=True,
-            enable_phase=False,
-        )
+                output[..., 1, :, :] = torch.sigmoid(output[..., 1, :, :])
+        return output
