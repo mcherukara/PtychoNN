@@ -56,9 +56,9 @@ class ReconSmallModel(nn.Module):
             *self.up_block(self.nconv * 4 * c, self.nconv * 2 * c, groups=c),
             *self.up_block(self.nconv * 2 * c, self.nconv * 1 * c, groups=c),
             nn.Conv2d(
-                self.nconv * 1 * c,
-                c,
-                3,
+                in_channels=self.nconv * 1 * c,
+                out_channels=c,
+                kernel_size=3,
                 stride=1,
                 padding=(1, 1),
                 bias=(not self.use_batch_norm),
@@ -80,9 +80,9 @@ class ReconSmallModel(nn.Module):
                  ()),
             nn.ReLU(),
             nn.Conv2d(
-                filters_out,
-                filters_out,
-                3,
+                in_channels=filters_out,
+                out_channels=filters_out,
+                kernel_size=3,
                 stride=1,
                 padding=(1, 1),
                 bias=(not self.use_batch_norm),
@@ -92,12 +92,12 @@ class ReconSmallModel(nn.Module):
             nn.MaxPool2d((2, 2))
         ]
 
-    def up_block(self, filters_in, filters_out, groups):
+    def up_block(self, filters_in: int, filters_out: int, groups: int):
         return [
             nn.Conv2d(
-                filters_in,
-                filters_out,
-                3,
+                in_channels=filters_in,
+                out_channels=filters_out,
+                kernel_size=3,
                 stride=1,
                 padding=(1, 1),
                 bias=(not self.use_batch_norm),
@@ -106,9 +106,9 @@ class ReconSmallModel(nn.Module):
                  ()),
             nn.ReLU(),
             nn.Conv2d(
-                filters_out,
-                filters_out,
-                3,
+                in_channels=filters_out,
+                out_channels=filters_out,
+                kernel_size=3,
                 stride=1,
                 padding=(1, 1),
                 bias=(not self.use_batch_norm),
