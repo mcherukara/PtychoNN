@@ -43,8 +43,8 @@ def stitch_from_inference(
     stitched : (COMBINED_WIDTH, COMBINED_HEIGHT) np.array
         The stitched together image.
     '''
-    pos_x = scan[..., 0]
-    pos_y = scan[..., 1]
+    pos_x = scan[..., 1]
+    pos_y = scan[..., 0]
 
     # The global axes of the stitched image in meters
     x = np.arange(pos_x.min(),
