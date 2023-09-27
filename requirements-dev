@@ -1,12 +1,9 @@
 click
-h5py
 importlib-metadata
-importlib-resources
 matplotlib
 numpy ~=1.21
 pytorch >=1.12,<2.1
 scikit-image
 scipy
-tifffile
 tqdm
 torchinfo
