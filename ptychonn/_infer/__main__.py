@@ -1,10 +1,10 @@
 import importlib.resources
 import pathlib
 import typing
+import glob
 
 from torch.utils.data import TensorDataset, DataLoader
 import click
-import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
@@ -85,14 +85,14 @@ def stitch_from_inference(
 
 @click.command(name='infer')
 @click.argument(
-    'data_path',
+    'data_dir',
     type=click.Path(
         exists=True,
         path_type=pathlib.Path,
     ),
 )
 @click.argument(
-    'scan_path',
+    'params_path',
     type=click.Path(
         exists=True,
         path_type=pathlib.Path,
@@ -106,8 +106,8 @@ def stitch_from_inference(
     ),
 )
 def infer_cli(
-    data_path: pathlib.Path,
-    scan_path: pathlib.Path,
+    data_dir: pathlib.Path,
+    params_path: pathlib.Path,
     out_dir: pathlib.Path,
 ):
     '''Infer a reconstructed image from diffraction patterns at DATA_PATH and
@@ -115,52 +115,71 @@ def infer_cli(
     OUT_DIR.
     '''
 
-    inferences_out_file = out_dir / 'inferences_506.npz'
-    click.echo(f'Does data path exist? {data_path.exists()}')
+    dataslist = []
+    scanlist = []
 
-    with h5py.File(data_path) as f:
-        data = f['entry/data/data'][()]
+    for name in glob.glob(str(data_dir / '*.npz')):
+        print(name)
+        with np.load(name) as f:
+            dataslist.append(f['reciprocal'])
+            scanlist.append(f['scan'])
+
+    data = np.concatenate(dataslist, axis=0)
+    scan = np.concatenate(scanlist, axis=0)
 
     inferences = infer(
         data=data,
-        inferences_out_file=inferences_out_file,
+        model_params_path=params_path,
     )
 
-    ## parameters required for stitching individual inferences
-    spiral_step = 0.05
-    step = spiral_step * -1e-6
-    spiral_traj = np.load(scan_path)
-    scan = np.stack((spiral_traj['x'], spiral_traj['y']), axis=-1) * step
-    stitched = stitch_from_inference(
-        inferences,
+    pstitched = stitch_from_inference(
+        inferences[:, 0],
         scan,
-        stitched_pixel_width=10e-9,
-        inference_pixel_width=10e-9,
+        stitched_pixel_width=1,
+        inference_pixel_width=1,
+    )
+    astitched = stitch_from_inference(
+        inferences[:, 1],
+        scan,
+        stitched_pixel_width=1,
+        inference_pixel_width=1,
     )
 
     # Plotting some summary images
     plt.figure(1, figsize=[8.5, 7])
-    plt.pcolormesh(stitched)
+    plt.imshow(pstitched)
     plt.colorbar()
     plt.tight_layout()
-    plt.title('stitched_inferences')
-    plt.savefig(out_dir / 'stitched_506.png', bbox_inches='tight')
+    plt.title('stitched_phases')
+    plt.savefig(out_dir / 'pstitched.png', bbox_inches='tight')
+
+    plt.figure(2, figsize=[8.5, 7])
+    plt.imshow(astitched)
+    plt.colorbar()
+    plt.tight_layout()
+    plt.title('stitched_amplitudes')
+    plt.savefig(out_dir / 'astitched.png', bbox_inches='tight')
 
     test_inferences = [0, 1, 2, 3]
     fig, axs = plt.subplots(1, 4, figsize=[13, 3])
     for ix, inf in enumerate(test_inferences):
-        plt.subplot(1, 4, ix + 1)
-        plt.pcolormesh(inferences[inf])
+        plt.subplot(2, 4, ix + 1)
+        plt.pcolormesh(inferences[inf, 0])
+        plt.colorbar()
+        plt.title('Inference at position {0}'.format(inf))
+        plt.subplot(2, 4, 4 + ix + 1)
+        plt.pcolormesh(inferences[inf, 1])
         plt.colorbar()
         plt.title('Inference at position {0}'.format(inf))
     plt.tight_layout()
-    plt.savefig(out_dir / 'inferences_0_to_4_scan506.png', bbox_inches='tight')
+    plt.savefig(out_dir / 'inferences.png', bbox_inches='tight')
 
     return 0
 
 
 def infer(
     data: npt.NDArray,
+    model_params_path: pathlib.Path,
     *,
     inferences_out_file: typing.Optional[pathlib.Path] = None,
 ) -> npt.NDArray:
@@ -181,10 +200,13 @@ def infer(
 
     Returns
     -------
-    inferences : (POSITION, WIDTH, HEIGHT)
+    inferences : (POSITION, 2, WIDTH, HEIGHT)
         The reconstructed patches inferred by the model.
     '''
-    tester = Tester()
+    tester = Tester(
+        model=ptychonn.model.ReconSmallModel(),
+        model_params_path=model_params_path,
+    )
     tester.setTestData(
         data,
         batch_size=max(torch.cuda.device_count(), 1) * 64,
@@ -193,56 +215,54 @@ def infer(
 
 
 class Tester():
-    '''
-    '''
 
     def __init__(
         self,
         *,
-        model: typing.Optional[torch.nn.Module] = None,
-        model_params_path: typing.Optional[pathlib.Path] = None,
+        model: torch.nn.Module,
+        model_params_path: pathlib.Path,
     ):
-        self.model = ptychonn.model.ReconSmallModel(
-        ) if model is None else model
-
-        if model_params_path is None:
-            with importlib.resources.path(
-                    'ptychonn._infer',
-                    'weights.pth',
-            ) as model_params_path:
-                self.model.load_state_dict(torch.load(model_params_path))
-        else:
-            self.model.load_state_dict(torch.load(model_params_path))
-
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
         print(f"Let's use {torch.cuda.device_count()} GPUs!")
 
-        if torch.cuda.device_count() > 1:
-            self.model = torch.nn.DataParallel(self.model)
+        self.model = model
 
-        self.model = self.model.to(self.device)
+        params = torch.load(
+            model_params_path,
+            map_location=self.device,
+        )
+        self.model.load_state_dict(params)
+
+        self.model = torch.nn.DataParallel(self.model)
+
+        self.model.to(self.device)
+
+        self.model.eval()
 
     def setTestData(self, X_test: np.ndarray, batch_size: int):
-        self.X_test = torch.tensor(X_test[:, None, ...].astype('float32'))
+        self.X_test = torch.tensor(X_test[:, None, ...], dtype=torch.float32)
         self.test_data = TensorDataset(self.X_test)
-        self.testloader = DataLoader(self.test_data,
-                                     batch_size=batch_size,
-                                     shuffle=False,
-                                     num_workers=4)
+        self.testloader = DataLoader(
+            self.test_data,
+            batch_size=batch_size,
+            shuffle=False,
+        )
 
     def predictTestData(self, npz_save_path: str = None):
-        self.model.eval()
+
         phs_eval = []
-        for i, ft_images in enumerate(self.testloader):
-            ft_images = ft_images[0].to(self.device)
-            ph_eval = self.model(ft_images)
-            for j in range(ft_images.shape[0]):
-                phs_eval.append(ph_eval[j].detach().to("cpu").numpy())
-        self.phs_eval = np.array(phs_eval).squeeze().astype('float32')
+        with torch.inference_mode():
+            for (ft_images, ) in self.testloader:
+                ph_eval = self.model(ft_images.to(self.device))
+                phs_eval.append(ph_eval.detach().cpu().numpy())
+
+        self.phs_eval = np.concatenate(phs_eval, axis=0)
+
         if npz_save_path is not None:
             np.savez_compressed(npz_save_path, ph=self.phs_eval)
             print(f'Finished the inference stage and saved at {npz_save_path}')
+
         return self.phs_eval
 
     def calcErrors(self, phs_true: np.ndarray, npz_save_path: str = None):
