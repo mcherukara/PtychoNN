@@ -14,8 +14,6 @@ class ReconSmallModel(nn.Module):
         The number of convolution kernels at the smallest level
     use_batch_norm :
         Whether to use batch normalization after convolution layers
-    enable_phase :
-        Whether the phase branch is included in the model
     enable_amplitude :
         Whether the amplitude branch is included in the model
 
