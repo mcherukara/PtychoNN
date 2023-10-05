@@ -36,9 +36,15 @@ logger = logging.getLogger(__name__)
         path_type=pathlib.Path,
     ),
 )
+@click.option(
+    '--epochs',
+    type=click.INT,
+    default=100,
+)
 def train_cli(
     data_dir: pathlib.Path,
     out_dir: pathlib.Path,
+    epochs: int,
 ):
     """Train a model from diffraction patterns and reconstructed patches.
 
@@ -67,10 +73,12 @@ def train_cli(
     # centering of the phase in the center 3rd of the reconstructed patches.
     # The diffraction patterns are converted to float32 and otherwise
     # unaltered.
-    patches = np.angle(patches).astype('float32')
-    patches -= np.mean(
-        patches[..., patches.shape[-2] // 3:-patches.shape[-2] // 3,
-                patches.shape[-1] // 3:-patches.shape[-1] // 3], )
+    phase = np.angle(patches).astype('float32')
+    phase -= np.mean(
+        phase[..., phase.shape[-2] // 3:-phase.shape[-2] // 3,
+              phase.shape[-1] // 3:-phase.shape[-1] // 3], )
+    amplitude = np.abs(patches).astype('float32')
+    patches = np.stack((phase, amplitude), axis=1)
 
     os.makedirs(out_dir, exist_ok=True)
 
@@ -78,8 +86,8 @@ def train_cli(
         X_train=data,
         Y_train=patches,
         out_dir=out_dir,
-        epochs=50,
-        batch_size=64,
+        epochs=epochs,
+        batch_size=32,
     )
 
 
@@ -89,7 +97,7 @@ def train(
     out_dir: pathlib.Path | None,
     load_model_path: pathlib.Path | None = None,
     epochs: int = 1,
-    batch_size: int = 64,
+    batch_size: int = 32,
 ):
     """Train a PtychoNN model.
 
@@ -97,7 +105,7 @@ def train(
     ----------
     X_train (N, WIDTH, HEIGHT)
         The diffraction patterns.
-    Y_train (N, WIDTH, HEIGHT)
+    Y_train (N, 2, WIDTH, HEIGHT)
         The corresponding reconstructed patches for the diffraction patterns.
     out_dir
         A folder where all the training artifacts are saved.
@@ -111,7 +119,7 @@ def train(
     logger.info("Creating the training model...")
 
     trainer = Trainer(
-        model=ptychonn.model.ReconSmallPhaseModel(),
+        model=ptychonn.model.ReconSmallModel(),
         batch_size=batch_size * torch.cuda.device_count(),
         output_path=out_dir,
     )
@@ -130,12 +138,12 @@ def train(
 
     if out_dir is not None:
         trainer.plotLearningRate(
-            save_fname=out_dir / 'learning_rate.svg',
+            save_fname=out_dir / 'learning_rate.png',
             show_fig=False,
         )
         ptychonn.plot.plot_metrics(
             trainer.metrics,
-            save_fname=out_dir / 'metrics.svg',
+            save_fname=out_dir / 'metrics.png',
             show_fig=False,
         )
 
@@ -168,7 +176,7 @@ class Trainer():
 
     def __init__(
         self,
-        model: ptychonn.model.ReconSmallPhaseModel,
+        model: ptychonn.model.ReconSmallModel,
         batch_size: int,
         output_path: pathlib.Path | None = None,
         output_suffix: str = '',
@@ -186,6 +194,22 @@ class Trainer():
         Y_ph_train_full: np.ndarray,
         valid_data_ratio: float = 0.1,
     ):
+        """
+
+        Parameters
+        ----------
+        X_train_full : (N, H, W)
+            The measured intensities at the detector
+        Y_ph_train_full : (N, C, H, W)
+            The phase and amplitude patches from the reconstructed object.
+            Phase in the zeroth channel and amplitude (optionally) in the first
+            channel
+
+        """
+        if (Y_ph_train_full.ndim != 4):
+            msg = ("Training data example patches must have a channel "
+                   "dimension! i.e. the shape should be (N, C, H, W)")
+            raise ValueError(msg)
         logger.info("Setting training data...")
 
         self.H, self.W = X_train_full.shape[-2:]
@@ -195,7 +219,7 @@ class Trainer():
             dtype=torch.float32,
         )
         self.Y_ph_train_full = torch.tensor(
-            Y_ph_train_full[:, None, ...],
+            Y_ph_train_full,
             dtype=torch.float32,
         )
         self.ntrain_full = self.X_train_full.shape[0]
@@ -269,20 +293,28 @@ class Trainer():
             mode='triangular2',
         )
 
-    def initModel(self, model_params_path: pathlib.Path | None = None):
+    def initModel(
+        self,
+        model_params_path: pathlib.Path | None = None,
+    ):
         """Load parameters from the disk then model to the GPU(s)."""
-
-        self.model_params_path = model_params_path
-        if model_params_path is not None:
-            self.model.load_state_dict(torch.load(self.model_params_path))
-        torchinfo.summary(self.model, (1, 1, self.H, self.W), device="cpu")
 
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
         print(f"Let's use {torch.cuda.device_count()} GPUs!")
 
-        if torch.cuda.device_count() > 1:
-            self.model = torch.nn.DataParallel(self.model)
+        torchinfo.summary(self.model, (1, 1, self.H, self.W), device="cpu")
+
+        self.model_params_path = model_params_path
+
+        if model_params_path is not None:
+            self.model.load_state_dict(
+                torch.load(
+                    self.model_params_path,
+                    map_location=self.device,
+                ))
+
+        self.model = torch.nn.DataParallel(self.model)
 
         self.model = self.model.to(self.device)
 
@@ -372,14 +404,13 @@ class Trainer():
                     self.output_suffix,
                 )
 
-                import tifffile
+                import matplotlib.pyplot as plt
                 os.makedirs(self.output_path / 'reference', exist_ok=True)
                 os.makedirs(self.output_path / 'inference', exist_ok=True)
-                tifffile.imwrite(
-                    self.output_path / f'reference/{epoch:05d}.tiff',
-                    phs[0, 0].detach().cpu().numpy().astype(np.float32))
-                tifffile.imwrite(
-                    self.output_path / f'inference/{epoch:05d}.tiff',
+                plt.imsave(self.output_path / f'reference/{epoch:05d}.png',
+                           phs[0, 0].detach().cpu().numpy().astype(np.float32))
+                plt.imsave(
+                    self.output_path / f'inference/{epoch:05d}.png',
                     pred_phs[0, 0].detach().cpu().numpy().astype(np.float32))
 
     @staticmethod
@@ -400,7 +431,7 @@ class Trainer():
 
     @staticmethod
     def updateSavedModel(
-        model: ptychonn.model.ReconSmallPhaseModel,
+        model: ptychonn.model.ReconSmallModel,
         directory: pathlib.Path,
         suffix: str = '',
     ):
@@ -453,7 +484,8 @@ class Trainer():
             self.model.eval()
 
             #Validation loop
-            self.validate(epoch)
+            with torch.inference_mode():
+                self.validate(epoch)
 
             if epoch % output_frequency == 0:
                 logger.info(
