@@ -2,6 +2,7 @@ import glob
 import logging
 import os
 import pathlib
+import typing
 
 import click
 import lightning
@@ -85,6 +86,9 @@ def train_cli(
     train(
         X_train=data,
         Y_train=patches,
+        model=init_or_load_model(
+            ptychonn.LitReconSmallModel,
+        ),
         out_dir=out_dir,
         epochs=epochs,
         batch_size=32,
@@ -94,12 +98,20 @@ def train_cli(
 def train(
     X_train: npt.NDArray[np.float32],
     Y_train: npt.NDArray[np.float32],
+    model: lightning.LightningModule,
     out_dir: pathlib.Path | None,
-    load_model_path: pathlib.Path | None = None,
     epochs: int = 1,
     batch_size: int = 32,
 ):
     """Train a PtychoNN model.
+
+    Initialize a model for the model parameter using the `init_or_load_model()`
+    function.
+
+    If out_dir is not None the following artifacts will be created:
+        - {out_dir}/best_model.ckpt
+        - {out_dir}/metrics.csv
+        - {out_dir}/hparams.yaml
 
     Parameters
     ----------
@@ -109,19 +121,35 @@ def train(
         The corresponding reconstructed patches for the diffraction patterns.
     out_dir
         A folder where all the training artifacts are saved.
-    load_model_path
-        Load a previous model's parameters from this file.
+    model
+        An initialized PtychoNN model.
+    epochs
+        The maximum number of training epochs
+    batch_size
+        The size of one training batch.
     """
+
+    checkpoint_callback = lightning.pytorch.callbacks.ModelCheckpoint(
+        dirpath=out_dir,
+        filename="best_model",
+        save_top_k=1,
+        monitor="training_loss",
+        mode="min",
+    )
+
+    logger = lightning.pytorch.loggers.CSVLogger(
+        save_dir=out_dir,
+        name="",
+        version="",
+        prefix="",
+    )
 
     trainer = lightning.Trainer(
         max_epochs=epochs,
         default_root_dir=out_dir,
+        callbacks=[checkpoint_callback],
+        logger=logger,
     )
-
-    if load_model_path is not None:
-        model = ptychonn.model.LitReconSmallModel.load_from_checkpoint(load_model_path)
-    else:
-        model = ptychonn.model.LitReconSmallModel()
 
     trainer.fit(
         model=model,
@@ -140,7 +168,7 @@ def create_training_dataloader(
     Y_train: npt.NDArray[np.float32],
     batch_size: int = 32,
 ) -> torch.utils.data.DataLoader:
-    """Create a Pytorch Dataloader from numpy arrays."""
+    """Create a Pytorch Dataloader from NumPy arrays."""
 
     assert Y_train.dtype == np.float32
     assert np.all(np.isfinite(Y_train))
@@ -173,3 +201,24 @@ def create_training_dataloader(
     )
 
     return dataloader
+
+
+def init_or_load_model(
+    model_type: typing.Type[lightning.LightningModule],
+    model_checkpoint_path: pathlib.Path | None,
+    model_init_params: dict | None,
+):
+    """Initialize one of the PtychoNN models via params or a checkpoint."""
+    if not (model_checkpoint_path is None or model_init_params is None):
+        msg = (
+            "One of model_checkpoint_path OR model_init_params must be None! "
+            "Both cannot be defined."
+        )
+        raise ValueError(msg)
+
+    if model_checkpoint_path is not None:
+        return model_type.load_from_checkpoint(
+            model_checkpoint_path
+        )
+    else:
+        return model_type(**model_init_params)
