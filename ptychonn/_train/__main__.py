@@ -162,6 +162,18 @@ def train(
         ),
     )
 
+    with open(out_dir / "metrics.csv") as f:
+        headers = f.readline().strip('\n').split(",")
+    numbers = np.genfromtxt(out_dir / "metrics.csv", delimiter=",", skip_header=1,)
+    metrics = dict()
+    for col, header in enumerate(headers):
+        metrics[header] = numbers[:, col]
+
+    ptychonn.plot.plot_metrics(
+        metrics=metrics,
+        save_fname=out_dir / "metrics.png",
+    )
+
     return trainer
 
 

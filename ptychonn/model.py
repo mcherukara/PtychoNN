@@ -137,14 +137,40 @@ class LitReconSmallModel(lightning.LightningModule):
     def training_step(self, batch, batch_idx):
         ft_images, object_roi = batch
         predicted = self.forward(ft_images)
-        loss = torch.nn.functional.mse_loss(predicted, object_roi)
+        loss_phase = torch.nn.functional.mse_loss(
+            predicted[..., 0, :, :],
+            object_roi[..., 0, :, :],
+        )
+        self.log("training_loss_phase", loss_phase)
+        if self.enable_amplitude:
+            loss_amp = torch.nn.functional.mse_loss(
+                predicted[..., 1, :, :],
+                object_roi[..., 1, :, :],
+            )
+            loss = loss_phase + loss_amp
+            self.log("training_loss_amplitude", loss_amp)
+        else:
+            loss = loss_phase
         self.log("training_loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
         ft_images, object_roi = batch
         predicted = self.forward(ft_images)
-        loss = torch.nn.functional.mse_loss(predicted, object_roi)
+        loss_phase = torch.nn.functional.mse_loss(
+            predicted[..., 0, :, :],
+            object_roi[..., 0, :, :],
+        )
+        self.log("validation_loss_phase", loss_phase)
+        if self.enable_amplitude:
+            loss_amp = torch.nn.functional.mse_loss(
+                predicted[..., 1, :, :],
+                object_roi[..., 1, :, :],
+            )
+            loss = loss_phase + loss_amp
+            self.log("validation_loss_amplitude", loss_amp)
+        else:
+            loss = loss_phase
         self.log("validation_loss", loss)
         return loss
 
