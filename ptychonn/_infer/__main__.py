@@ -3,6 +3,7 @@ import typing
 import glob
 
 import click
+import lightning
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
@@ -127,7 +128,11 @@ def infer_cli(
 
     inferences = infer(
         data=data,
-        model_params_path=params_path,
+        model=ptychonn.init_or_load_model(
+            ptychonn.model.LitReconSmallModel,
+            model_checkpoint_path=params_path,
+            model_init_params=None,
+        )
     )
 
     pstitched = stitch_from_inference(
@@ -177,7 +182,7 @@ def infer_cli(
 
 def infer(
     data: npt.NDArray[np.float32],
-    model_params_path: pathlib.Path,
+    model: lightning.LightningModule,
     *,
     inferences_out_file: typing.Optional[pathlib.Path] = None,
 ) -> npt.NDArray:
@@ -189,10 +194,15 @@ def infer(
     Set the CUDA_VISIBLE_DEVICES environment variable to control which GPUs
     will be used.
 
+    Initialize a model for the model parameter using the `init_or_load_model()`
+    function.
+
     Parameters
     ----------
     data : (POSITION, WIDTH, HEIGHT)
         Diffraction patterns to be reconstructed.
+    model
+        An initialized PtychoNN model.
     inferences_out_file : pathlib.Path
         Optional file to save reconstructed patches.
 
@@ -201,9 +211,6 @@ def infer(
     inferences : (POSITION, 2, WIDTH, HEIGHT)
         The reconstructed patches inferred by the model.
     '''
-    model = ptychonn.model.LitReconSmallModel.load_from_checkpoint(
-        model_params_path,
-    )
     model.eval()
     result = []
     with torch.no_grad():

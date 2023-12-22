@@ -88,6 +88,8 @@ def train_cli(
         Y_train=patches,
         model=init_or_load_model(
             ptychonn.LitReconSmallModel,
+            model_checkpoint_path=None,
+            model_init_params=dict(),
         ),
         out_dir=out_dir,
         epochs=epochs,
@@ -115,9 +117,9 @@ def train(
 
     Parameters
     ----------
-    X_train (N, WIDTH, HEIGHT)
+    X_train : (N, WIDTH, HEIGHT)
         The diffraction patterns.
-    Y_train (N, 2, WIDTH, HEIGHT)
+    Y_train : (N, 2, WIDTH, HEIGHT)
         The corresponding reconstructed patches for the diffraction patterns.
     out_dir
         A folder where all the training artifacts are saved.
@@ -205,6 +207,7 @@ def create_training_dataloader(
 
 def init_or_load_model(
     model_type: typing.Type[lightning.LightningModule],
+    *,
     model_checkpoint_path: pathlib.Path | None,
     model_init_params: dict | None,
 ):
