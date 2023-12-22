@@ -179,10 +179,13 @@ class LitReconSmallModel(lightning.LightningModule):
             self.parameters(),
             lr=self.max_lr,
         )
+        iters_per_epoch = self.trainer.estimated_stepping_batches / self.trainer.max_epochs
+        iters_per_half_cycle = self.epochs_per_half_cycle * iters_per_epoch
         scheduler = torch.optim.lr_scheduler.CyclicLR(
             optimizer,
             max_lr=self.max_lr,
             base_lr=self.min_lr,
+            step_size_up=iters_per_half_cycle,
             cycle_momentum=False,
             mode="triangular2",
         )
