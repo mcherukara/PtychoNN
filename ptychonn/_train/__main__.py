@@ -4,10 +4,10 @@ import os
 import pathlib
 
 import click
+import lightning
 import numpy as np
 import numpy.typing as npt
 import torch
-import torchinfo
 
 import ptychonn.model
 import ptychonn.plot
@@ -92,8 +92,8 @@ def train_cli(
 
 
 def train(
-    X_train: npt.NDArray[float],
-    Y_train: npt.NDArray[float],
+    X_train: npt.NDArray[np.float32],
+    Y_train: npt.NDArray[np.float32],
     out_dir: pathlib.Path | None,
     load_model_path: pathlib.Path | None = None,
     epochs: int = 1,
@@ -112,38 +112,64 @@ def train(
     load_model_path
         Load a previous model's parameters from this file.
     """
-    assert Y_train.dtype == np.float32
-    assert np.all(np.isfinite(Y_train))
-    assert X_train.dtype == np.float32
-    assert np.all(np.isfinite(X_train))
-    assert X_train.ndim == 4
-    assert Y_train.ndim == 4
-
-    traindata = torch.utils.data.TensorDataset(
-        torch.from_numpy(X_train),
-        torch.from_numpy(Y_train),
-    )
-
-    trainloader = torch.utils.data.DataLoader(
-        traindata,
-        batch_size=batch_size,
-        shuffle=True,
-        drop_last=True,
-    )
 
     trainer = lightning.Trainer(
         max_epochs=epochs,
         default_root_dir=out_dir,
     )
 
-    model = ptychonn.model.LitReconSmallModel()
-
     if load_model_path is not None:
         model = ptychonn.model.LitReconSmallModel.load_from_checkpoint(load_model_path)
+    else:
+        model = ptychonn.model.LitReconSmallModel()
 
     trainer.fit(
         model=model,
-        train_dataloaders=trainloader,
+        train_dataloaders=create_training_dataloader(
+            X_train,
+            Y_train,
+            batch_size,
+        ),
     )
 
     return trainer
+
+
+def create_training_dataloader(
+    X_train: npt.NDArray[np.float32],
+    Y_train: npt.NDArray[np.float32],
+    batch_size: int = 32,
+) -> torch.utils.data.DataLoader:
+    """Create a Pytorch Dataloader from numpy arrays."""
+
+    assert Y_train.dtype == np.float32
+    assert np.all(np.isfinite(Y_train))
+    assert X_train.dtype == np.float32
+    assert np.all(np.isfinite(X_train))
+
+    if X_train.ndim != 3:
+        msg = (
+            "X_train must have 3 dimemnsions: (N, WIDTH, HEIGHT); "
+            f" not {X_train.shape}"
+        )
+        raise ValueError(msg)
+    if Y_train.ndim != 4:
+        msg = (
+            f"Y_train must have 4 dimensions: (N, [1,2], WIDTH, HEIGHT); "
+            f"not {Y_train.shape}"
+        )
+        raise ValueError(msg)
+
+    dataset = torch.utils.data.TensorDataset(
+        torch.from_numpy(X_train[:, None, :, :]),
+        torch.from_numpy(Y_train),
+    )
+
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=True,
+    )
+
+    return dataloader

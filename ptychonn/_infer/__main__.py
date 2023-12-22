@@ -2,7 +2,6 @@ import pathlib
 import typing
 import glob
 
-from torch.utils.data import TensorDataset, DataLoader
 import click
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +9,6 @@ import numpy.typing as npt
 import scipy.interpolate
 import torch
 import tqdm
-import lightning
 
 import ptychonn.model
 
@@ -178,7 +176,7 @@ def infer_cli(
 
 
 def infer(
-    data: npt.NDArray,
+    data: npt.NDArray[np.float32],
     model_params_path: pathlib.Path,
     *,
     inferences_out_file: typing.Optional[pathlib.Path] = None,
@@ -207,7 +205,7 @@ def infer(
         model_params_path,
     )
     model.eval()
-    result = list()
+    result = []
     with torch.no_grad():
         for batch in data:
             result.append(
@@ -217,4 +215,8 @@ def infer(
             )
 
     result = np.concatenate(result, axis=0)
+
+    if inferences_out_file is not None:
+        np.save(inferences_out_file, result)
+
     return result

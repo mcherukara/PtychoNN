@@ -31,6 +31,8 @@ class LitReconSmallModel(lightning.LightningModule):
         nconv: int = 16,
         use_batch_norm: bool = True,
         enable_amplitude: bool = True,
+        min_lr: float = 1e-4,
+        max_lr: float = 5e-4,
     ):
         super().__init__()
         self.nconv = nconv
@@ -38,8 +40,8 @@ class LitReconSmallModel(lightning.LightningModule):
         self.enable_amplitude = enable_amplitude
 
         self.epochs_per_half_cycle: int = 6
-        self.max_lr: float = 5e-4
-        self.min_lr: float = 1e-4
+        self.max_lr: float = max_lr
+        self.min_lr: float = min_lr
 
         # Appears sequential has similar functionality as TF avoiding need for
         # separate model definition and activ
