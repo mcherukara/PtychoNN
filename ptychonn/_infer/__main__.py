@@ -10,6 +10,7 @@ import numpy.typing as npt
 import scipy.interpolate
 import torch
 import tqdm
+import lightning
 
 import ptychonn.model
 
@@ -202,82 +203,18 @@ def infer(
     inferences : (POSITION, 2, WIDTH, HEIGHT)
         The reconstructed patches inferred by the model.
     '''
-    tester = Tester(
-        model=ptychonn.model.ReconSmallModel(),
-        model_params_path=model_params_path,
+    model = ptychonn.model.LitReconSmallModel.load_from_checkpoint(
+        model_params_path,
     )
-    tester.setTestData(
-        data,
-        batch_size=max(torch.cuda.device_count(), 1) * 64,
-    )
-    return tester.predictTestData(npz_save_path=inferences_out_file)
+    model.eval()
+    result = list()
+    with torch.no_grad():
+        for batch in data:
+            result.append(
+                model(torch.from_numpy(batch[None, None, :, :]).to("cuda"))
+                .cpu()
+                .numpy()
+            )
 
-
-class Tester():
-
-    def __init__(
-        self,
-        *,
-        model: torch.nn.Module,
-        model_params_path: pathlib.Path,
-    ):
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Let's use {torch.cuda.device_count()} GPUs!")
-
-        self.model = model
-
-        params = torch.load(
-            model_params_path,
-            map_location=self.device,
-        )
-        self.model.load_state_dict(params)
-
-        self.model = torch.nn.DataParallel(self.model)
-
-        self.model.to(self.device)
-
-        self.model.eval()
-
-    def setTestData(self, X_test: np.ndarray, batch_size: int):
-        self.X_test = torch.tensor(X_test[:, None, ...], dtype=torch.float32)
-        self.test_data = TensorDataset(self.X_test)
-        self.testloader = DataLoader(
-            self.test_data,
-            batch_size=batch_size,
-            shuffle=False,
-        )
-
-    def predictTestData(self, npz_save_path: str = None):
-
-        phs_eval = []
-        with torch.inference_mode():
-            for (ft_images, ) in self.testloader:
-                ph_eval = self.model(ft_images.to(self.device))
-                phs_eval.append(ph_eval.detach().cpu().numpy())
-
-        self.phs_eval = np.concatenate(phs_eval, axis=0)
-
-        if npz_save_path is not None:
-            np.savez_compressed(npz_save_path, ph=self.phs_eval)
-            print(f'Finished the inference stage and saved at {npz_save_path}')
-
-        return self.phs_eval
-
-    def calcErrors(self, phs_true: np.ndarray, npz_save_path: str = None):
-        from skimage.metrics import mean_squared_error as mse
-
-        self.phs_true = phs_true
-        self.errors = []
-        for i, (p1, p2) in enumerate(zip(self.phs_eval, self.phs_true)):
-            err2 = mse(p1, p2)
-            self.errors.append([err2])
-
-        self.errors = np.array(self.errors)
-        print("Mean errors in phase")
-        print(np.mean(self.errors, axis=0))
-
-        if npz_save_path is not None:
-            np.savez_compressed(npz_save_path, phs_err=self.errors[:, 0])
-
-        return self.errors
+    result = np.concatenate(result, axis=0)
+    return result
