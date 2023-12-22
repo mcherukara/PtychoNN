@@ -135,20 +135,14 @@ def infer_cli(
         )
     )
 
+    # Plotting some summary images
+
     pstitched = stitch_from_inference(
         inferences[:, 0],
         scan,
         stitched_pixel_width=1,
         inference_pixel_width=1,
     )
-    astitched = stitch_from_inference(
-        inferences[:, 1],
-        scan,
-        stitched_pixel_width=1,
-        inference_pixel_width=1,
-    )
-
-    # Plotting some summary images
     plt.figure(1, figsize=[8.5, 7])
     plt.imshow(pstitched)
     plt.colorbar()
@@ -156,6 +150,12 @@ def infer_cli(
     plt.title('stitched_phases')
     plt.savefig(out_dir / 'pstitched.png', bbox_inches='tight')
 
+    astitched = stitch_from_inference(
+        inferences[:, 1],
+        scan,
+        stitched_pixel_width=1,
+        inference_pixel_width=1,
+    )
     plt.figure(2, figsize=[8.5, 7])
     plt.imshow(astitched)
     plt.colorbar()
