@@ -114,6 +114,7 @@ def train(
         - {out_dir}/best_model.ckpt
         - {out_dir}/metrics.csv
         - {out_dir}/hparams.yaml
+        - {out_dir}/metrics.png
 
     Parameters
     ----------
@@ -130,27 +131,29 @@ def train(
     batch_size
         The size of one training batch.
     """
+    if out_dir is not None:
 
-    checkpoint_callback = lightning.pytorch.callbacks.ModelCheckpoint(
-        dirpath=out_dir,
-        filename="best_model",
-        save_top_k=1,
-        monitor="training_loss",
-        mode="min",
-    )
+        checkpoint_callback = lightning.pytorch.callbacks.ModelCheckpoint(
+            dirpath=out_dir,
+            filename="best_model",
+            save_top_k=1,
+            monitor="training_loss",
+            mode="min",
+        )
 
-    logger = lightning.pytorch.loggers.CSVLogger(
-        save_dir=out_dir,
-        name="",
-        version="",
-        prefix="",
-    )
+        logger = lightning.pytorch.loggers.CSVLogger(
+            save_dir=out_dir,
+            name="",
+            version="",
+            prefix="",
+        )
 
     trainer = lightning.Trainer(
         max_epochs=epochs,
         default_root_dir=out_dir,
-        callbacks=[checkpoint_callback],
-        logger=logger,
+        callbacks=None if out_dir is None else [checkpoint_callback],
+        logger=False if out_dir is None else logger,
+        enable_checkpointing=False if out_dir is None else True,
     )
 
     trainer.fit(
@@ -162,17 +165,19 @@ def train(
         ),
     )
 
-    with open(out_dir / "metrics.csv") as f:
-        headers = f.readline().strip('\n').split(",")
-    numbers = np.genfromtxt(out_dir / "metrics.csv", delimiter=",", skip_header=1,)
-    metrics = dict()
-    for col, header in enumerate(headers):
-        metrics[header] = numbers[:, col]
+    if out_dir is not None:
 
-    ptychonn.plot.plot_metrics(
-        metrics=metrics,
-        save_fname=out_dir / "metrics.png",
-    )
+        with open(out_dir / "metrics.csv") as f:
+            headers = f.readline().strip('\n').split(",")
+        numbers = np.genfromtxt(out_dir / "metrics.csv", delimiter=",", skip_header=1,)
+        metrics = dict()
+        for col, header in enumerate(headers):
+            metrics[header] = numbers[:, col]
+
+        ptychonn.plot.plot_metrics(
+            metrics=metrics,
+            save_fname=out_dir / "metrics.png",
+        )
 
     return trainer
 
