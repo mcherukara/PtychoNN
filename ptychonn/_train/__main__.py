@@ -1,3 +1,4 @@
+import argparse
 import glob
 import logging
 import os
@@ -97,6 +98,52 @@ def train_cli(
     )
 
 
+class ListLogger(lightning.pytorch.loggers.logger.Logger):
+    """An in-memory logger that saves logged parameters to a List
+
+    Parameters
+    ----------
+    logs :
+        Each entry of this list is a dictionary with parameter name value
+        pairs. Each entry of the list represents the parameters during a single
+        step.
+    hyperparameters :
+        Some hyperparameters that were logged?
+
+    """
+    def __init__(self):
+        super().__init__()
+        self.logs: typing.List[typing.Dict] = []
+        self.hyperparameters: argparse.Namespace = argparse.Namespace()
+
+    @lightning.pytorch.utilities.rank_zero_only
+    def log_metrics(self, metrics, step=None):
+        metrics["step"] = step
+        self.logs.append(metrics)
+
+    @lightning.pytorch.utilities.rank_zero_only
+    def log_hyperparams(self, params):
+        self.hyperparameters = params
+
+    @lightning.pytorch.utilities.rank_zero_only
+    def save(self):
+        # No need to save anything for this logger
+        pass
+
+    @lightning.pytorch.utilities.rank_zero_only
+    def finalize(self, status):
+        # Finalize the logger
+        pass
+
+    @property
+    def name(self):
+        return "ListLogger"
+
+    @property
+    def version(self):
+        return "0.1.0"
+
+
 def train(
     X_train: npt.NDArray[np.float32],
     Y_train: npt.NDArray[np.float32],
@@ -104,7 +151,7 @@ def train(
     out_dir: pathlib.Path | None,
     epochs: int = 1,
     batch_size: int = 32,
-):
+) -> typing.Tuple[lightning.Trainer, lightning.pytorch.loggers.CSVLogger | ListLogger]:
     """Train a PtychoNN model.
 
     Initialize a model for the model parameter using the `init_or_load_model()`
@@ -132,7 +179,6 @@ def train(
         The size of one training batch.
     """
     if out_dir is not None:
-
         checkpoint_callback = lightning.pytorch.callbacks.ModelCheckpoint(
             dirpath=out_dir,
             filename="best_model",
@@ -148,11 +194,14 @@ def train(
             prefix="",
         )
 
+    else:
+        logger = ListLogger()
+
     trainer = lightning.Trainer(
         max_epochs=epochs,
         default_root_dir=out_dir,
         callbacks=None if out_dir is None else [checkpoint_callback],
-        logger=False if out_dir is None else logger,
+        logger=logger,
         enable_checkpointing=False if out_dir is None else True,
     )
 
@@ -166,10 +215,13 @@ def train(
     )
 
     if out_dir is not None:
-
         with open(out_dir / "metrics.csv") as f:
-            headers = f.readline().strip('\n').split(",")
-        numbers = np.genfromtxt(out_dir / "metrics.csv", delimiter=",", skip_header=1,)
+            headers = f.readline().strip("\n").split(",")
+        numbers = np.genfromtxt(
+            out_dir / "metrics.csv",
+            delimiter=",",
+            skip_header=1,
+        )
         metrics = dict()
         for col, header in enumerate(headers):
             metrics[header] = numbers[:, col]
@@ -179,7 +231,7 @@ def train(
             save_fname=out_dir / "metrics.png",
         )
 
-    return trainer
+    return trainer, logger
 
 
 def create_training_dataloader(
@@ -237,8 +289,6 @@ def init_or_load_model(
         raise ValueError(msg)
 
     if model_checkpoint_path is not None:
-        return model_type.load_from_checkpoint(
-            model_checkpoint_path
-        )
+        return model_type.load_from_checkpoint(model_checkpoint_path)
     else:
         return model_type(**model_init_params)
