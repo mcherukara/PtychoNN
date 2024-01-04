@@ -292,3 +292,11 @@ def init_or_load_model(
         return model_type.load_from_checkpoint(model_checkpoint_path)
     else:
         return model_type(**model_init_params)
+
+def create_model_checkpoint(
+    trainer: lightning.Trainer,
+    model_checkpoint_path: pathlib.Path,
+):
+    trainer.save_checkpoint(
+        model_checkpoint_path,
+    )
