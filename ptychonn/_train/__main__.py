@@ -1,13 +1,15 @@
+import argparse
 import glob
 import logging
 import os
 import pathlib
+import typing
 
 import click
+import lightning
 import numpy as np
 import numpy.typing as npt
 import torch
-import torchinfo
 
 import ptychonn.model
 import ptychonn.plot
@@ -85,451 +87,248 @@ def train_cli(
     train(
         X_train=data,
         Y_train=patches,
+        model=init_or_load_model(
+            ptychonn.LitReconSmallModel,
+            model_checkpoint_path=None,
+            model_init_params=dict(),
+        ),
         out_dir=out_dir,
         epochs=epochs,
         batch_size=32,
     )
 
 
-def train(
-    X_train: npt.NDArray[float],
-    Y_train: npt.NDArray[float],
-    out_dir: pathlib.Path | None,
-    load_model_path: pathlib.Path | None = None,
-    epochs: int = 1,
-    batch_size: int = 32,
-):
-    """Train a PtychoNN model.
+class ListLogger(lightning.pytorch.loggers.logger.Logger):
+    """An in-memory logger that saves logged parameters to a List
 
     Parameters
     ----------
-    X_train (N, WIDTH, HEIGHT)
+    logs :
+        Each entry of this list is a dictionary with parameter name value
+        pairs. Each entry of the list represents the parameters during a single
+        step. Not every parameter is logged for each step.
+    hyperparameters :
+        Some hyperparameters that were logged?
+
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.logs: typing.List[typing.Dict] = []
+        self.hyperparameters: argparse.Namespace = argparse.Namespace()
+
+    @lightning.pytorch.utilities.rank_zero_only
+    def log_metrics(self, metrics, step=None):
+        metrics["step"] = step
+        self.logs.append(metrics)
+
+    @lightning.pytorch.utilities.rank_zero_only
+    def log_hyperparams(self, params):
+        self.hyperparameters = params
+
+    @lightning.pytorch.utilities.rank_zero_only
+    def save(self):
+        # No need to save anything for this logger
+        pass
+
+    @lightning.pytorch.utilities.rank_zero_only
+    def finalize(self, status):
+        # Finalize the logger
+        pass
+
+    @property
+    def name(self):
+        return "ListLogger"
+
+    @property
+    def version(self):
+        return "0.1.0"
+
+
+def train(
+    X_train: npt.NDArray[np.float32],
+    Y_train: npt.NDArray[np.float32],
+    model: lightning.LightningModule,
+    out_dir: pathlib.Path | None,
+    epochs: int = 1,
+    batch_size: int = 32,
+) -> typing.Tuple[lightning.Trainer, lightning.pytorch.loggers.CSVLogger | ListLogger]:
+    """Train a PtychoNN model.
+
+    Initialize a model for the model parameter using the `init_or_load_model()`
+    function.
+
+    If out_dir is not None the following artifacts will be created:
+        - {out_dir}/best_model.ckpt
+        - {out_dir}/metrics.csv
+        - {out_dir}/hparams.yaml
+        - {out_dir}/metrics.png
+
+    Parameters
+    ----------
+    X_train : (N, WIDTH, HEIGHT)
         The diffraction patterns.
-    Y_train (N, 2, WIDTH, HEIGHT)
+    Y_train : (N, 2, WIDTH, HEIGHT)
         The corresponding reconstructed patches for the diffraction patterns.
     out_dir
         A folder where all the training artifacts are saved.
-    load_model_path
-        Load a previous model's parameters from this file.
+    model
+        An initialized PtychoNN model.
+    epochs
+        The maximum number of training epochs
+    batch_size
+        The size of one training batch.
     """
+    if out_dir is not None:
+        checkpoint_callback = lightning.pytorch.callbacks.ModelCheckpoint(
+            dirpath=out_dir,
+            filename="best_model",
+            save_top_k=1,
+            monitor="training_loss",
+            mode="min",
+        )
+
+        logger = lightning.pytorch.loggers.CSVLogger(
+            save_dir=out_dir,
+            name="",
+            version="",
+            prefix="",
+        )
+
+    else:
+        logger = ListLogger()
+
+    trainer = lightning.Trainer(
+        max_epochs=epochs,
+        default_root_dir=out_dir,
+        callbacks=None if out_dir is None else [checkpoint_callback],
+        logger=logger,
+        enable_checkpointing=False if out_dir is None else True,
+    )
+
+    train_dataloader, val_dataloader = create_training_dataloader(
+        X_train,
+        Y_train,
+        batch_size,
+    )
+
+    trainer.fit(
+        model=model,
+        train_dataloaders=train_dataloader,
+        val_dataloaders=val_dataloader,
+    )
+
+    if out_dir is not None:
+        with open(out_dir / "metrics.csv") as f:
+            headers = f.readline().strip("\n").split(",")
+        numbers = np.genfromtxt(
+            out_dir / "metrics.csv",
+            delimiter=",",
+            skip_header=1,
+        )
+        metrics = dict()
+        for col, header in enumerate(headers):
+            metrics[header] = numbers[:, col]
+
+        ptychonn.plot.plot_metrics(
+            metrics=metrics,
+            save_fname=out_dir / "metrics.png",
+        )
+
+    return trainer, logger
+
+
+def create_training_dataloader(
+    X_train: npt.NDArray[np.float32],
+    Y_train: npt.NDArray[np.float32],
+    batch_size: int = 32,
+    training_fraction: float = 0.8,
+) -> typing.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader | None]:
+    """Create a Pytorch Dataloader from NumPy arrays."""
+
+    if training_fraction > 1.0 or training_fraction <= 0.0:
+        msg = f"training_fraction must be >0,<=1, not {training_fraction}!"
+        raise ValueError(msg)
+
     assert Y_train.dtype == np.float32
     assert np.all(np.isfinite(Y_train))
     assert X_train.dtype == np.float32
     assert np.all(np.isfinite(X_train))
-    logger.info("Creating the training model...")
 
-    trainer = Trainer(
-        model=ptychonn.model.ReconSmallModel(),
-        batch_size=batch_size * torch.cuda.device_count(),
-        output_path=out_dir,
+    if X_train.ndim != 3:
+        msg = (
+            "X_train must have 3 dimemnsions: (N, WIDTH, HEIGHT); "
+            f" not {X_train.shape}"
+        )
+        raise ValueError(msg)
+    if Y_train.ndim != 4:
+        msg = (
+            f"Y_train must have 4 dimensions: (N, [1,2], WIDTH, HEIGHT); "
+            f"not {Y_train.shape}"
+        )
+        raise ValueError(msg)
+
+    dataset = torch.utils.data.TensorDataset(
+        torch.from_numpy(X_train[:, None, :, :]),
+        torch.from_numpy(Y_train),
     )
-    trainer.setTrainingData(
-        X_train,
-        Y_train,
-        valid_data_ratio=0.1,
-    )
-    trainer.setOptimizationParams(
-        epochs_per_half_cycle=6,
-        max_lr=1e-3,
-        min_lr=1e-4,
-    )
-    trainer.initModel(model_params_path=load_model_path)
-    trainer.run(epochs)
 
-    if out_dir is not None:
-        trainer.plotLearningRate(
-            save_fname=out_dir / 'learning_rate.png',
-            show_fig=False,
-        )
-        ptychonn.plot.plot_metrics(
-            trainer.metrics,
-            save_fname=out_dir / 'metrics.png',
-            show_fig=False,
-        )
-
-    return trainer
-
-
-class Trainer():
-    """A object that manages training PtychoNN
-
-    Artifacts
-    ---------
-
-    When `output_path` is not None, the following artifacts are written to disk.
-
-    ```
-        `output_path`
-            reference
-                00000.tiff
-                00001.tiff
-                ...
-            inference
-                00000.tiff
-                00001.tiff
-                ...
-            metrics`output_suffix`.npz
-            best_model`output_suffix`.pth
-    ```
-
-    """
-
-    def __init__(
-        self,
-        model: ptychonn.model.ReconSmallModel,
-        batch_size: int,
-        output_path: pathlib.Path | None = None,
-        output_suffix: str = '',
-    ):
-        logger.info("Initializing the training procedure...")
-        self.model = model
-        self.batch_size = batch_size
-        self.output_path = output_path
-        self.output_suffix = output_suffix
-        self.epoch = 0
-
-    def setTrainingData(
-        self,
-        X_train_full: np.ndarray,
-        Y_ph_train_full: np.ndarray,
-        valid_data_ratio: float = 0.1,
-    ):
-        """
-
-        Parameters
-        ----------
-        X_train_full : (N, H, W)
-            The measured intensities at the detector
-        Y_ph_train_full : (N, C, H, W)
-            The phase and amplitude patches from the reconstructed object.
-            Phase in the zeroth channel and amplitude (optionally) in the first
-            channel
-
-        """
-        if (Y_ph_train_full.ndim != 4):
-            msg = ("Training data example patches must have a channel "
-                   "dimension! i.e. the shape should be (N, C, H, W)")
-            raise ValueError(msg)
-        logger.info("Setting training data...")
-
-        self.H, self.W = X_train_full.shape[-2:]
-
-        self.X_train_full = torch.tensor(
-            X_train_full[:, None, ...],
-            dtype=torch.float32,
-        )
-        self.Y_ph_train_full = torch.tensor(
-            Y_ph_train_full,
-            dtype=torch.float32,
-        )
-        self.ntrain_full = self.X_train_full.shape[0]
-
-        self.valid_data_ratio = valid_data_ratio
-        self.nvalid = int(self.ntrain_full * self.valid_data_ratio)
-        self.ntrain = self.ntrain_full - self.nvalid
-
-        self.train_data_full = torch.utils.data.TensorDataset(
-            self.X_train_full,
-            self.Y_ph_train_full,
-        )
-
-        self.train_data, self.valid_data = torch.utils.data.random_split(
-            self.train_data_full,
-            [self.ntrain, self.nvalid],
-        )
-        self.trainloader = torch.utils.data.DataLoader(
-            self.train_data,
-            batch_size=self.batch_size,
+    if training_fraction == 1.0:
+        trainingloader = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=batch_size,
             shuffle=True,
-            num_workers=4,
-            drop_last=False,
+            drop_last=True,
         )
 
-        self.validloader = torch.utils.data.DataLoader(
-            self.valid_data,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=4,
-            drop_last=False,
+        return trainingloader, None
+
+    training, validation = torch.utils.data.random_split(
+        dataset,
+        [training_fraction, 1.0 - training_fraction],
+    )
+
+    trainingloader = torch.utils.data.DataLoader(
+        training,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=True,
+    )
+
+    validationloader = torch.utils.data.DataLoader(
+        validation,
+        batch_size=batch_size,
+        shuffle=False,
+        drop_last=True,
+    )
+
+    return trainingloader, validationloader
+
+
+def init_or_load_model(
+    model_type: typing.Type[lightning.LightningModule],
+    *,
+    model_checkpoint_path: pathlib.Path | None,
+    model_init_params: dict | None,
+):
+    """Initialize one of the PtychoNN models via params or a checkpoint."""
+    if not (model_checkpoint_path is None or model_init_params is None):
+        msg = (
+            "One of model_checkpoint_path OR model_init_params must be None! "
+            "Both cannot be defined."
         )
+        raise ValueError(msg)
 
-        self.iters_per_epoch = self.ntrain // self.batch_size + (
-            self.ntrain % self.batch_size > 0)
+    if model_checkpoint_path is not None:
+        return model_type.load_from_checkpoint(model_checkpoint_path)
+    else:
+        return model_type(**model_init_params)
 
-    def setOptimizationParams(
-        self,
-        epochs_per_half_cycle: int = 6,
-        max_lr: float = 5e-4,
-        min_lr: float = 1e-4,
-    ):
-        logger.info("Setting optimization parameters...")
 
-        # TODO: Move this note about iterations into the documentation string
-        # after figuring out what it means. Paper recommends 2-10 number of
-        # iterations
-        self.epochs_per_half_cycle = epochs_per_half_cycle
-        self.iters_per_half_cycle = epochs_per_half_cycle * self.iters_per_epoch
-
-        logger.info(
-            "LR step size is: %d which is every %d epochs",
-            self.iters_per_half_cycle,
-            self.iters_per_half_cycle / self.iters_per_epoch,
-        )
-
-        self.max_lr = max_lr
-        self.min_lr = min_lr
-
-        self.criterion = self.customLoss
-        self.optimizer = torch.optim.Adam(
-            self.model.parameters(),
-            lr=self.max_lr,
-        )
-        self.scheduler = torch.optim.lr_scheduler.CyclicLR(
-            self.optimizer,
-            max_lr=self.max_lr,
-            base_lr=self.min_lr,
-            step_size_up=self.iters_per_half_cycle,
-            cycle_momentum=False,
-            mode='triangular2',
-        )
-
-    def initModel(
-        self,
-        model_params_path: pathlib.Path | None = None,
-    ):
-        """Load parameters from the disk then model to the GPU(s)."""
-
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Let's use {torch.cuda.device_count()} GPUs!")
-
-        torchinfo.summary(self.model, (1, 1, self.H, self.W), device="cpu")
-
-        self.model_params_path = model_params_path
-
-        if model_params_path is not None:
-            self.model.load_state_dict(
-                torch.load(
-                    self.model_params_path,
-                    map_location=self.device,
-                ))
-
-        self.model = torch.nn.DataParallel(self.model)
-
-        self.model = self.model.to(self.device)
-
-        self.scaler = torch.cuda.amp.GradScaler()
-
-        logger.info("Setting up metrics...")
-        self.metrics = {
-            'losses': [],
-            'val_losses': [],
-            'lrs': [],
-            'best_val_loss': np.inf
-        }
-        logger.info(self.metrics)
-
-    def train(self):
-        tot_loss = 0.0
-        loss_ph = 0.0
-
-        for (ft_images, phs) in self.trainloader:
-
-            # Move everything to device
-            ft_images = ft_images.to(self.device)
-            phs = phs.to(self.device)
-
-            # Divide cumulative loss by number of batches-- slightly inaccurate
-            # because last batch is different size
-            pred_phs = self.model(ft_images)
-            loss_p = self.criterion(pred_phs, phs, self.ntrain)
-            # Monitor phase loss but only within support (which may not be same
-            # as true amp)
-            loss = loss_p
-            # Use equiweighted amps and phase
-
-            # Zero current grads and do backprop
-            self.optimizer.zero_grad()
-            self.scaler.scale(loss).backward()
-            self.scaler.step(self.optimizer)
-
-            tot_loss += loss.detach().item()
-
-            loss_ph += loss_p.detach().item()
-
-            # Update the LR according to the schedule -- CyclicLR updates each
-            # batch
-            self.scheduler.step()
-            self.metrics['lrs'].append(self.scheduler.get_last_lr())
-            self.scaler.update()
-
-        self.metrics['losses'].append([tot_loss, loss_ph])
-
-    def validate(self, epoch: int):
-        tot_val_loss = 0.0
-        val_loss_ph = 0.0
-        for (ft_images, phs) in self.validloader:
-            ft_images = ft_images.to(self.device)
-            phs = phs.to(self.device)
-            pred_phs = self.model(ft_images)
-
-            val_loss_p = self.criterion(pred_phs, phs, self.nvalid)
-            val_loss = val_loss_p
-
-            tot_val_loss += val_loss.detach().item()
-            val_loss_ph += val_loss_p.detach().item()
-
-        self.metrics['val_losses'].append([tot_val_loss, val_loss_ph])
-
-        if self.output_path is not None:
-            self.saveMetrics(
-                self.metrics,
-                self.output_path,
-                self.output_suffix,
-            )
-
-        # Update saved model if val loss is lower
-        if (tot_val_loss < self.metrics['best_val_loss']):
-            logger.info(
-                "Saving improved model after Val Loss improved from %.5f to %.5f",
-                self.metrics['best_val_loss'],
-                tot_val_loss,
-            )
-            self.metrics['best_val_loss'] = tot_val_loss
-
-            if self.output_path is not None:
-                self.updateSavedModel(
-                    self.model,
-                    self.output_path,
-                    self.output_suffix,
-                )
-
-                import matplotlib.pyplot as plt
-                os.makedirs(self.output_path / 'reference', exist_ok=True)
-                os.makedirs(self.output_path / 'inference', exist_ok=True)
-                plt.imsave(self.output_path / f'reference/{epoch:05d}.png',
-                           phs[0, 0].detach().cpu().numpy().astype(np.float32))
-                plt.imsave(
-                    self.output_path / f'inference/{epoch:05d}.png',
-                    pred_phs[0, 0].detach().cpu().numpy().astype(np.float32))
-
-    @staticmethod
-    def customLoss(
-        input: torch.tensor,
-        target: torch.tensor,
-        scaling: float,
-    ):
-        """A loss function which scales according to training set size."""
-        assert torch.all(torch.isfinite(input))
-        assert torch.all(torch.isfinite(target))
-        return torch.sum(torch.mean(
-            torch.abs(input - target),
-            axis=(-1, -2),
-        )) / scaling
-
-    # TODO: Use a callback instead of a static method for saving the model?
-
-    @staticmethod
-    def updateSavedModel(
-        model: ptychonn.model.ReconSmallModel,
-        directory: pathlib.Path,
-        suffix: str = '',
-    ):
-        """Writes `model` parameters to `directory`/best_model`suffix`.pth
-
-        The directory is created if it does not exist.
-        """
-        fname = directory / f'best_model{ suffix }.pth'
-        logger.info("Saving best model as %s", fname)
-        os.makedirs(directory, exist_ok=True)
-        if isinstance(model, (
-                torch.nn.DataParallel,
-                torch.nn.parallel.DistributedDataParallel,
-        )):
-            torch.save(model.module.state_dict(), fname)
-        else:
-            torch.save(model.state_dict(), fname)
-
-    def getSavedModelPath(self) -> pathlib.Path | None:
-        """Return the path where `validate` will save the model weights"""
-        if self.output_path is None:
-            return None
-        return self.output_path / f'best_model{ self.output_suffix }.pth'
-
-    @staticmethod
-    def saveMetrics(
-        metrics: dict,
-        directory: pathlib.Path,
-        suffix: str = '',
-    ):
-        """Writes `metrics` to `directory`/metrics`suffix`.npz
-
-        The directory is created if it does not exist.
-        """
-        os.makedirs(directory, exist_ok=True)
-        np.savez(directory / f'metrics{suffix}.npz', **metrics)
-
-    def run(self, epochs: int, output_frequency: int = 1):
-        """The main training loop"""
-
-        for epoch in range(epochs):
-
-            #Set model to train mode
-            self.model.train()
-
-            #Training loop
-            self.train()
-
-            #Switch model to eval mode
-            self.model.eval()
-
-            #Validation loop
-            with torch.inference_mode():
-                self.validate(epoch)
-
-            if epoch % output_frequency == 0:
-                logger.info(
-                    'Epoch: %d | FT  | Train Loss: %1.03e | Val Loss: %1.03e',
-                    epoch,
-                    self.metrics['losses'][-1][0],
-                    self.metrics['val_losses'][-1][0],
-                )
-                logger.info(
-                    'Epoch: %d | Ph  | Train Loss: %1.03e | Val Loss: %1.03e',
-                    epoch,
-                    self.metrics['losses'][-1][1],
-                    self.metrics['val_losses'][-1][1],
-                )
-                logger.info(
-                    'Epoch: %d | Ending LR: %1.03e',
-                    epoch,
-                    self.metrics['lrs'][-1][0],
-                )
-
-    def plotLearningRate(
-        self,
-        save_fname: pathlib.Path | None = None,
-        show_fig: bool = True,
-    ):
-        batches = np.linspace(
-            0,
-            len(self.metrics['lrs']),
-            len(self.metrics['lrs']) + 1,
-        )
-        epoch_list = batches / self.iters_per_epoch
-
-        import matplotlib.pyplot as plt
-
-        f = plt.figure()
-        plt.plot(epoch_list[1:], self.metrics['lrs'], 'C3-')
-        plt.grid()
-        plt.ylabel("Learning rate")
-        plt.xlabel("Epoch")
-        plt.tight_layout()
-
-        if save_fname is not None:
-            plt.savefig(save_fname)
-        if show_fig:
-            plt.show()
-        else:
-            plt.close(f)
+def create_model_checkpoint(
+    trainer: lightning.Trainer,
+    model_checkpoint_path: pathlib.Path,
+):
+    trainer.save_checkpoint(
+        model_checkpoint_path,
+    )

@@ -1,11 +1,12 @@
 """Define PtychoNN Pytorch models."""
 
+import lightning
 import numpy as np
 import torch
 import torch.nn as nn
 
 
-class ReconSmallModel(nn.Module):
+class LitReconSmallModel(lightning.LightningModule):
     """A small PychoNN model.
 
     Parameters
@@ -30,11 +31,17 @@ class ReconSmallModel(nn.Module):
         nconv: int = 16,
         use_batch_norm: bool = True,
         enable_amplitude: bool = True,
+        min_lr: float = 1e-4,
+        max_lr: float = 5e-4,
     ):
         super().__init__()
         self.nconv = nconv
         self.use_batch_norm = use_batch_norm
         self.enable_amplitude = enable_amplitude
+
+        self.epochs_per_half_cycle: int = 6
+        self.max_lr: float = max_lr
+        self.min_lr: float = min_lr
 
         # Appears sequential has similar functionality as TF avoiding need for
         # separate model definition and activ
@@ -118,12 +125,71 @@ class ReconSmallModel(nn.Module):
         ]
 
     def forward(self, x):
-        with torch.cuda.amp.autocast():
-            output = self.decoder(self.encoder(x))
-            # Restore -pi to pi range
-            # Using tanh activation (-1 to 1) for phase so multiply by pi
-            output[..., 0, :, :] = torch.tanh(output[..., 0, :, :]) * np.pi
-            # Restrict amplitude to (0, 1) range with sigmoid
-            if self.enable_amplitude:
-                output[..., 1, :, :] = torch.sigmoid(output[..., 1, :, :])
+        output = self.decoder(self.encoder(x))
+        # Restore -pi to pi range
+        # Using tanh activation (-1 to 1) for phase so multiply by pi
+        output[..., 0, :, :] = torch.tanh(output[..., 0, :, :]) * np.pi
+        # Restrict amplitude to (0, 1) range with sigmoid
+        if self.enable_amplitude:
+            output[..., 1, :, :] = torch.sigmoid(output[..., 1, :, :])
         return output
+
+    def training_step(self, batch, batch_idx):
+        ft_images, object_roi = batch
+        predicted = self.forward(ft_images)
+        loss_phase = torch.nn.functional.mse_loss(
+            predicted[..., 0, :, :],
+            object_roi[..., 0, :, :],
+        )
+        self.log("training_loss_phase", loss_phase)
+        if self.enable_amplitude:
+            loss_amp = torch.nn.functional.mse_loss(
+                predicted[..., 1, :, :],
+                object_roi[..., 1, :, :],
+            )
+            loss = loss_phase + loss_amp
+            self.log("training_loss_amplitude", loss_amp)
+        else:
+            loss = loss_phase
+        self.log("training_loss", loss)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        ft_images, object_roi = batch
+        predicted = self.forward(ft_images)
+        loss_phase = torch.nn.functional.mse_loss(
+            predicted[..., 0, :, :],
+            object_roi[..., 0, :, :],
+        )
+        self.log("validation_loss_phase", loss_phase)
+        if self.enable_amplitude:
+            loss_amp = torch.nn.functional.mse_loss(
+                predicted[..., 1, :, :],
+                object_roi[..., 1, :, :],
+            )
+            loss = loss_phase + loss_amp
+            self.log("validation_loss_amplitude", loss_amp)
+        else:
+            loss = loss_phase
+        self.log("validation_loss", loss)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(
+            self.parameters(),
+            lr=self.max_lr,
+        )
+        iters_per_epoch = self.trainer.estimated_stepping_batches / self.trainer.max_epochs
+        iters_per_half_cycle = self.epochs_per_half_cycle * iters_per_epoch
+        scheduler = torch.optim.lr_scheduler.CyclicLR(
+            optimizer,
+            max_lr=self.max_lr,
+            base_lr=self.min_lr,
+            step_size_up=iters_per_half_cycle,
+            cycle_momentum=False,
+            mode="triangular2",
+        )
+        return dict(
+            optimizer=optimizer,
+            lr_scheduler=scheduler,
+        )
