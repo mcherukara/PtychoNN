@@ -106,11 +106,12 @@ class ListLogger(lightning.pytorch.loggers.logger.Logger):
     logs :
         Each entry of this list is a dictionary with parameter name value
         pairs. Each entry of the list represents the parameters during a single
-        step.
+        step. Not every parameter is logged for each step.
     hyperparameters :
         Some hyperparameters that were logged?
 
     """
+
     def __init__(self):
         super().__init__()
         self.logs: typing.List[typing.Dict] = []
@@ -205,13 +206,16 @@ def train(
         enable_checkpointing=False if out_dir is None else True,
     )
 
+    train_dataloader, val_dataloader = create_training_dataloader(
+        X_train,
+        Y_train,
+        batch_size,
+    )
+
     trainer.fit(
         model=model,
-        train_dataloaders=create_training_dataloader(
-            X_train,
-            Y_train,
-            batch_size,
-        ),
+        train_dataloaders=train_dataloader,
+        val_dataloaders=val_dataloader,
     )
 
     if out_dir is not None:
@@ -238,8 +242,13 @@ def create_training_dataloader(
     X_train: npt.NDArray[np.float32],
     Y_train: npt.NDArray[np.float32],
     batch_size: int = 32,
-) -> torch.utils.data.DataLoader:
+    training_fraction: float = 0.8,
+) -> typing.Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader | None]:
     """Create a Pytorch Dataloader from NumPy arrays."""
+
+    if training_fraction > 1.0 or training_fraction <= 0.0:
+        msg = f"training_fraction must be >0,<=1, not {training_fraction}!"
+        raise ValueError(msg)
 
     assert Y_train.dtype == np.float32
     assert np.all(np.isfinite(Y_train))
@@ -264,14 +273,36 @@ def create_training_dataloader(
         torch.from_numpy(Y_train),
     )
 
-    dataloader = torch.utils.data.DataLoader(
+    if training_fraction == 1.0:
+        trainingloader = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            drop_last=True,
+        )
+
+        return trainingloader, None
+
+    training, validation = torch.utils.data.random_split(
         dataset,
+        [training_fraction, 1.0 - training_fraction],
+    )
+
+    trainingloader = torch.utils.data.DataLoader(
+        training,
         batch_size=batch_size,
         shuffle=True,
         drop_last=True,
     )
 
-    return dataloader
+    validationloader = torch.utils.data.DataLoader(
+        validation,
+        batch_size=batch_size,
+        shuffle=False,
+        drop_last=True,
+    )
+
+    return trainingloader, validationloader
 
 
 def init_or_load_model(
@@ -292,6 +323,7 @@ def init_or_load_model(
         return model_type.load_from_checkpoint(model_checkpoint_path)
     else:
         return model_type(**model_init_params)
+
 
 def create_model_checkpoint(
     trainer: lightning.Trainer,
