@@ -2,15 +2,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def _filter_nan(x, y):
+    mask = np.logical_and(np.isfinite(x), np.isfinite(y))
+    return x[mask], y[mask]
+
 def plot_metrics(metrics: dict,
                  save_fname: str = None,
                  show_fig: bool = False):
 
     fig, ax = plt.subplots(3, sharex=True, figsize=(16, 9))
     if 'training_loss' in metrics:
-        ax[0].plot(metrics['step'], metrics['training_loss'], 'C3o-', label="Train")
+        ax[0].plot(*_filter_nan(metrics['step'], metrics['training_loss']), 'C3o-', label="Train")
     if 'validation_loss' in metrics:
-        ax[0].plot(metrics['step'], metrics['validation_loss'], 'C0o-', label="Val")
+        ax[0].plot(*_filter_nan(metrics['step'], metrics['validation_loss']), 'C0o-', label="Val")
     ax[0].set(ylabel='Loss')
     ax[0].set_yscale('log')
     ax[0].grid()
@@ -18,9 +22,9 @@ def plot_metrics(metrics: dict,
     ax[0].set_title('Total loss')
 
     if 'training_loss_amplitude' in metrics:
-        ax[1].plot(metrics['step'], metrics['training_loss_amplitude'], 'C3o-', label="Train Amp loss")
+        ax[1].plot(*_filter_nan(metrics['step'], metrics['training_loss_amplitude']), 'C3o-', label="Train Amp loss")
     if 'validation_loss_amplitude' in metrics:
-        ax[1].plot(metrics['step'], metrics['validation_loss_amplitude'], 'C0o-', label="Val Amp loss")
+        ax[1].plot(*_filter_nan(metrics['step'], metrics['validation_loss_amplitude']), 'C0o-', label="Val Amp loss")
     ax[1].set(ylabel='Loss')
     ax[1].set_yscale('log')
     ax[1].grid()
@@ -28,9 +32,9 @@ def plot_metrics(metrics: dict,
     ax[1].set_title('Phase loss')
 
     if 'training_loss_phase' in metrics:
-        ax[2].plot(metrics['step'], metrics['training_loss_phase'], 'C3o-', label="Train Ph loss")
+        ax[2].plot(*_filter_nan(metrics['step'], metrics['training_loss_phase']), 'C3o-', label="Train Ph loss")
     if 'validation_loss_phase' in metrics:
-        ax[2].plot(metrics['step'], metrics['validation_loss_phase'], 'C0o-', label="Val Ph loss")
+        ax[2].plot(*_filter_nan(metrics['step'], metrics['validation_loss_phase']), 'C0o-', label="Val Ph loss")
     ax[2].set(ylabel='Loss')
     ax[2].grid()
     ax[2].legend()
