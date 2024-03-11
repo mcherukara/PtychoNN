@@ -3,10 +3,13 @@ logging.getLogger(__name__).setLevel(logging.INFO)
 
 import collections
 import json
-import tomllib
 import dataclasses
+import warnings
 from typing import Any
-
+try:
+    import tomli
+except:
+    warnings.warn('Unable to import tomli, which is needed to load a TOML config file.')
 
 @dataclasses.dataclass
 
@@ -64,7 +67,7 @@ class ConfigDict(collections.defaultdict):
         This function only overwrites entries contained in the TOML file. Unspecified entries are unaffected.
         """
         f = open(filename, 'rb')
-        d = tomllib.load(f)
+        d = tomli.load(f)
         for key in d.keys():
             self.__dict__[key] = d[key]
         f.close()
