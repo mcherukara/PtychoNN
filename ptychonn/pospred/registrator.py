@@ -404,7 +404,7 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
         y_min += (window_offset[0] + shift_range_y[0])
         x_min += (window_offset[1] + shift_range_x[0])
         if abs(y_min) > 100 or abs(x_min) > 100:
-            warnings.warn('A suspiciously large offset was detected ({}, {}). If this does not seem normal, the search '
+            logger.debug('A suspiciously large offset was detected ({}, {}). If this does not seem normal, the search '
                           'range is likely too small which caused the result to diverge. Adjust the search range above '
                           'the largest possible offset. \nSolved quadratic coefficients: {}.'.format(
                 y_min, x_min, x_vec))

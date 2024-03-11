@@ -3,6 +3,7 @@ logging.getLogger(__name__).setLevel(logging.INFO)
 
 import collections
 import json
+import tomllib
 import dataclasses
 from typing import Any
 
@@ -54,6 +55,16 @@ class ConfigDict(collections.defaultdict):
         """
         f = open(filename, 'r')
         d = json.load(f)
+        for key in d.keys():
+            self.__dict__[key] = d[key]
+        f.close()
+
+    def load_from_toml(self, filename):
+        """
+        This function only overwrites entries contained in the TOML file. Unspecified entries are unaffected.
+        """
+        f = open(filename, 'rb')
+        d = tomllib.load(f)
         for key in d.keys():
             self.__dict__[key] = d[key]
         f.close()

@@ -20,7 +20,7 @@ def test_multiiter_pos_calculation():
         probe_position_list=None,
         central_crop=None
     )
-    config_dict.load_from_json(os.path.join('data', 'config_{}.json'.format(scan_idx)))
+    config_dict.load_from_toml(os.path.join('data', 'config_{}.toml'.format(scan_idx)))
     print(config_dict)
 
     corrector_chain = ProbePositionCorrectorChain(config_dict)
