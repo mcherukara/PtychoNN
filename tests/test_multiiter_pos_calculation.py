@@ -14,13 +14,13 @@ def test_multiiter_pos_calculation():
     scan_idx = 235
 
     config_dict = InferenceConfigDict(
-        reconstruction_image_path=os.path.join('data', 'pred_test{}'.format(scan_idx), 'pred_phase.tiff'),
+        reconstruction_image_path=os.path.join('data', 'pospred', 'pred_test{}'.format(scan_idx), 'pred_phase.tiff'),
         random_seed=196,
         debug=False,
         probe_position_list=None,
         central_crop=None
     )
-    config_dict.load_from_toml(os.path.join('data', 'config_{}.toml'.format(scan_idx)))
+    config_dict.load_from_toml(os.path.join('data', 'pospred', 'config_{}.toml'.format(scan_idx)))
     print(config_dict)
 
     corrector_chain = ProbePositionCorrectorChain(config_dict)
@@ -30,8 +30,8 @@ def test_multiiter_pos_calculation():
 
     calc_pos_list = corrector_chain.corrector_list[-1].new_probe_positions.array
 
-    gold_pos_list = np.genfromtxt(os.path.join('data_gold',
-                                               'calc_pos_235_collective_niters_2_beta_0p5_nn_12_sw_1e-2_1e-3.csv'),
+    gold_pos_list = np.genfromtxt(os.path.join('data_gold', 'pospred', 
+                                               'calc_pos_235.csv'),
                                   delimiter=',')
     gold_pos_list = gold_pos_list / 8e-9
     calc_pos_list -= np.mean(calc_pos_list, axis=0)
