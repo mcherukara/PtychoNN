@@ -12,14 +12,6 @@ except:
 @dataclasses.dataclass
 
 class ConfigDict:
-    def __str__(self, *args, **kwargs):
-        s = ''
-        for key in self.__dict__.keys():
-            s += '{}: {}\n'.format(key, self.__dict__[key])
-        return s
-
-    def __repr__(self):
-        return self.__str__()
 
     @staticmethod
     def is_jsonable(x):
@@ -76,10 +68,10 @@ class ConfigDict:
 class InferenceConfigDict(ConfigDict):
 
     # ===== PtychoNN configs =====
-    batch_size: Any = 1
+    batch_size: int = 1
     """Inference batch size."""
 
-    model_path: Any = None
+    model_path: str = None
     """Path to a trained PtychoNN model."""
 
     model: Any = None
@@ -99,38 +91,38 @@ class InferenceConfigDict(ConfigDict):
     Should be either None or a Reconstructor object. If None, PyTorchReconstructor is used by default.
     """
 
-    dp_data_path: Any = None
+    dp_data_path: str = None
     """
     The path to the diffraction data file. When using a VirtualReconstrutor that uses already-reconstructed images, 
     keep this as None.
     """
 
-    prediction_output_path: Any = None
+    prediction_output_path: str = None
     """Path to save PtychoNN prediction results."""
 
-    cpu_only: Any = False
+    cpu_only: bool = False
 
     onnx_mdl: Any = None
     """ONNX file when using ONNXReconstructor."""
 
     # ===== Image registration configs =====
-    registration_method: Any = 'error_map'
+    registration_method: str = 'error_map'
 
-    do_subpixel: Any = True
+    do_subpixel: bool = True
 
-    use_fast_errormap: Any = False
+    use_fast_errormap: bool = False
 
-    sift_outlier_removal_method: Any = 'kmeans'
+    sift_outlier_removal_method: str = 'kmeans'
     """Method for detecting outlier matches for SIFT. Can be "trial_error", "kmeans", "isoforest", "ransac"."""
 
-    sift_border_exclusion_length: Any = 16
+    sift_border_exclusion_length: int = 16
     """
     The length of the near-boundary region of the image. When doing SIFT registration, if a matching pair of
     keypoints involve points in this region, it will be discarded. However, if all matches (after outlier removal)
     are near-boundary, they are used as they are. This operation is less aggressive than `central_crop`.
     """
 
-    registration_downsample: Any = 1
+    registration_downsample: int = 1
     """Image downsampling before registration."""
 
     hybrid_registration_algs: Any = ('error_map_multilevel', 'error_map_expandable', 'sift')
@@ -139,7 +131,7 @@ class InferenceConfigDict(ConfigDict):
     hybrid_registration_tols: Any = (0.15, 0.3, 0.3)
     """Hybrid registration tolerances. This value is disregarded unless registration method is hybrid."""
 
-    nonhybrid_registration_tol: Any = None
+    nonhybrid_registration_tol: float = None
     """Error tolerance for non-hybrid registration. This value is disregarded if registration method is hybrid."""
 
     registration_tol_schedule: Any = None
@@ -149,15 +141,15 @@ class InferenceConfigDict(ConfigDict):
     after that point.
     """
 
-    min_roi_stddev: Any = 0.2
+    min_roi_stddev: float = 0.2
 
-    subpixel_fitting_window_size: Any = 5
+    subpixel_fitting_window_size: int = 5
 
-    subpixel_diff_tolerance: Any = 2
+    subpixel_diff_tolerance: float = 2.0
 
-    subpixel_fitting_check_coefficients: Any = True
+    subpixel_fitting_check_coefficients: bool = True
 
-    errormap_error_check_tol: Any = 0.3
+    errormap_error_check_tol: float = 0.3
 
     # ===== General configs =====
     reconstruction_image_path: Any = None
@@ -168,7 +160,7 @@ class InferenceConfigDict(ConfigDict):
     the reconstructed images to ptycho_reconstructor.
     """
 
-    dp_data_file_path: Any = None
+    dp_data_file_path: str = None
 
     dp_data_file_handle: Any = None
     """Used as an alternative to `dp_data_file_path`. Should be a `DataFileHandle` object."""
@@ -181,64 +173,65 @@ class InferenceConfigDict(ConfigDict):
 
     probe_position_data_path: Any = None
 
-    probe_position_data_unit: Any = None
+    probe_position_data_unit: str = None
+    """Unit of provided probe position. Can be 'nm', 'm', or 'pixel'."""
 
-    pixel_size_nm: Any = None
+    pixel_size_nm: float = None
 
     baseline_position_list: Any = None
     """Baseline positions. Used by ProbePositionCorrectorChain when the serial mode result is bad."""
 
     central_crop: Any = None
     """
-    Patch size used for image registration. If smaller than the reconstructed object size, a patch will
-    be cropped from the center.
+    List or tuple of int. Patch size used for image registration. If smaller than the reconstructed object size, 
+    a patch will be cropped from the center.
     """
 
-    method: Any = 'collective'
+    method: str = 'collective'
     """Method for correction. Can be 'serial' or 'collective'"""
 
-    max_shift: Any = 7
+    max_shift: int = 7
 
-    num_neighbors_collective: Any = 3
+    num_neighbors_collective: int = 3
     """Number of neighbors in collective registration"""
 
-    offset_estimator_order: Any = 1
+    offset_estimator_order: int = 1
 
-    offset_estimator_beta: Any = 0.5
+    offset_estimator_beta: float = 0.5
 
-    smooth_constraint_weight: Any = 1e-2
+    smooth_constraint_weight: float = 1e-2
 
-    use_baseline_offsets_for_uncertain_pairs: Any = False
+    use_baseline_offsets_for_uncertain_pairs: bool = False
 
-    rectangular_grid: Any = False
+    rectangular_grid: bool = False
 
-    use_baseline_offsets_for_points_on_same_row: Any = False
+    use_baseline_offsets_for_points_on_same_row: bool = False
 
-    use_baseline_offsets_for_unregistered_points: Any = False
+    use_baseline_offsets_for_unregistered_points: bool = False
     """
     If True, if a point is not successfully registered with any neighbor in collective mode, it will fill
     the linear system with the offsets of the two adjacently indexed points to that point from baseline positions.
     """
 
-    stitching_downsampling: Any = 1
+    stitching_downsampling: int = 1
 
     random_seed: Any = 123
 
-    debug: Any = None
+    debug: bool = False
 
 
 class TrainingConfigDict(ConfigDict):
-    batch_size_per_process: Any = 64
+    batch_size_per_process: int = 64
 
-    num_epochs: Any = 60
+    num_epochs: int = 60
 
-    learning_rate_per_process: Any = 1e-3
+    learning_rate_per_process: float = 1e-3
 
-    optimizer: Any = 'adam'
+    optimizer: str = 'adam'
 
     """String of optimizer name or the handle of a subclass of torch.optim.Optimizer"""
 
-    model_save_dir: Any = '.'
+    model_save_dir: str = '.'
     """Directory to save trained models"""
 
     model: Any = None
@@ -252,37 +245,37 @@ class TrainingConfigDict(ConfigDict):
         second is a dictionary of keyword arguments. The model will be instantiated using these.
     """
 
-    l1_weight: Any = 0
+    l1_weight: float = 0
 
-    tv_weight: Any = 0
+    tv_weight: float = 0
 
 
 class PtychoNNTrainingConfigDict(TrainingConfigDict):
-    height: Any = 256
+    height: int = 256
 
-    width: Any = 256
+    width: int = 256
 
-    num_lines_for_training: Any = 100
+    num_lines_for_training: int = 100
     """Number of lines used for training"""
 
-    num_lines_for_testing: Any = 60
+    num_lines_for_testing: int = 60
     """Number of lines used for testing"""
 
-    num_lines_for_validation: Any = 805
+    num_lines_for_validation: int = 805
     """Number of lines used for testing"""
 
     dataset: Any = None
     """A torch.Dataset object"""
 
-    validation_ratio: Any = 0.003
+    validation_ratio: float = 0.003
     """Ratio of validation set out of the entire dataset"""
 
     loss_function: Any = None
     """Can be None (default to L1Loss) or a Callable."""
 
-    dataset_decimation_ratio: Any = 1
+    dataset_decimation_ratio: float = 1.0
 
-    schedule_learning_rate: Any = True
+    schedule_learning_rate: bool = True
 
-    pretrained_model_path: Any = None
+    pretrained_model_path: str = None
 
