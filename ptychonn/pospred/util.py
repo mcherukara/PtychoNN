@@ -1,6 +1,3 @@
-import logging
-logging.getLogger(__name__).setLevel(logging.INFO)
-
 import time
 from functools import wraps
 import random

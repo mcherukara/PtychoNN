@@ -1,6 +1,3 @@
-import logging
-logging.getLogger(__name__).setLevel(logging.INFO)
-
 import copy
 
 import numpy as np

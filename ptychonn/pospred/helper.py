@@ -1,6 +1,3 @@
-import logging
-logging.getLogger(__name__).setLevel(logging.INFO)
-
 try:
     import pycuda.driver as cuda
     import tensorrt as trt

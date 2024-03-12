@@ -1,6 +1,3 @@
-import logging
-logging.getLogger(__name__).setLevel(logging.INFO)
-
 import collections
 import json
 import dataclasses
@@ -11,9 +8,10 @@ try:
 except:
     warnings.warn('Unable to import tomli, which is needed to load a TOML config file.')
 
+
 @dataclasses.dataclass
 
-class ConfigDict(collections.defaultdict):
+class ConfigDict:
     def __str__(self, *args, **kwargs):
         s = ''
         for key in self.__dict__.keys():
