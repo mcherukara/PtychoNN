@@ -23,6 +23,21 @@ Run prediction on diffraction patterns in PtychoNN and save all the images as a 
 Create an `InferenceConfigDict` object and set `reconstruction_image_path` and other parameters 
 like `num_neighbors_collective`, `method`, etc. Use the default parameters as a starting point. 
 
+Image registration parameters are supplied in a `RegistrationConfigDict` object to `registration_params`
+of `InferenceConfigDict`, for example:
+```
+configs = InferenceConfigDict(
+    ...
+    registration_params=RegistrationConfigDict(
+        registration_method='error_map',
+        ...
+    )
+)
+```
+If the settings for `RegistrationConfigDict` are stored in and read from a JSON or TOML file,
+just put these parameters at the **same level** as other parameters. Don't create nested structures
+in config files.
+
 To start with an initial position set, create a `ProbePositionList` object with the initial positions,
 and pass this object to the config obejct:
 ```

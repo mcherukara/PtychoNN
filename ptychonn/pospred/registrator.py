@@ -11,20 +11,17 @@ import scipy.ndimage as ndi
 import scipy.signal
 import skimage
 
+from ptychonn.pospred.configs import RegistrationConfigDict
 
 class Registrator:
 
-    def __init__(self, method='error_map', max_shift=None, random_seed=123, **kwargs):
-        self.kwargs = kwargs
-        self.method = method
-        self.max_shift = max_shift
+    def __init__(self, configs: RegistrationConfigDict, random_seed: int=123, **kwargs):
+        self.configs = configs
         self.random_seed = random_seed
         self.algorithm_dict = {'error_map': ErrorMapRegistrationAlgorithm,
                                'sift': SIFTRegistrationAlgorithm,
                                'hybrid': HybridRegistrationAlgorithm}
-        if 'tol' in self.kwargs.keys() and self.kwargs['tol'] is None:
-            del self.kwargs['tol']
-        self.algorithm = self.algorithm_dict[method](max_shift=self.max_shift, **self.kwargs)
+        self.algorithm = self.algorithm_dict[self.configs.registration_method](self.configs, **kwargs)
         self.algorithm.random_seed = self.random_seed
 
     def has_registratable_features(self, img, std_threshold=0.003, abs_threshold=None):
@@ -43,8 +40,7 @@ class Registrator:
         :param current: object image of the current scan point.
         :return: np.ndarray.
         """
-        if 'use_baseline_offsets_for_uncertain_pairs' in self.kwargs.keys() and \
-                self.kwargs['use_baseline_offsets_for_uncertain_pairs']:
+        if self.configs.use_baseline_offsets_for_uncertain_pairs:
             if ((not self.has_registratable_features(previous, std_threshold=0.003, abs_threshold=0.2)) or
                     (not self.has_registratable_features(current, std_threshold=0.003, abs_threshold=0.2))):
                 logging.debug('One or both images appear to be empty. Using baseline offset for this pair.')
@@ -73,17 +69,17 @@ class Registrator:
                 logging.debug('Updated tol to {}.'.format(new_tol))
 
     def update_tol(self, new_tol):
-        self.kwargs['tol'] = new_tol
+        self.configs.nonhybrid_registration_tol = new_tol
         self.algorithm.tol = new_tol
 
 
 class RegistrationAlgorithm:
-    def __init__(self, tol=0.3, min_roi_stddev=0.2, *args, **kwargs):
+    def __init__(self, configs: RegistrationConfigDict, *args, **kwargs):
         self.status_dict = {'ok': 0, 'questionable': 1, 'bad': 2, 'empty': 3}
         self.status = 0
         self.random_seed = 123
-        self.tol = tol
-        self.min_roi_stddev = min_roi_stddev
+        self.tol = configs.nonhybrid_registration_tol
+        self.min_roi_stddev = configs.min_roi_stddev
         self.debug = False
 
     def run(self, previous, current, *args, **kwargs):
@@ -123,25 +119,18 @@ class RegistrationAlgorithm:
 
 
 class HybridRegistrationAlgorithm(RegistrationAlgorithm):
-    def __init__(self, algs=('error_map_multilevel', 'error_map_expandable', 'sift'), tols=(0.08, 0.3, 0.3),
-                 min_roi_stddev=0.2, max_shift=7, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, configs: RegistrationConfigDict, *args, **kwargs):
+        super().__init__(configs, *args, **kwargs)
         self.alg_list = []
-        self.alg_names = algs
-        self.subpixel = kwargs['subpixel']
-        for i, alg in enumerate(algs):
+        self.alg_names = configs.hybrid_registration_algs
+        for i, alg in enumerate(self.alg_names):
             if alg == 'error_map_multilevel':
-                self.alg_list.append(
-                    ErrorMapRegistrationAlgorithm(subpixel=False, max_shift=max_shift, n_levels=3, tol=tols[i],
-                                                  min_roi_stddev=min_roi_stddev))
+                self.alg_list.append(ErrorMapRegistrationAlgorithm(configs))
             elif alg == 'error_map_expandable':
-                self.alg_list.append(
-                    ErrorMapRegistrationAlgorithm(subpixel=self.subpixel, max_shift=max_shift, n_levels=1, tol=tols[i],
-                                                  min_roi_stddev=min_roi_stddev))
+                self.alg_list.append(ErrorMapRegistrationAlgorithm(configs))
             elif alg == 'sift':
-                self.alg_list.append(
-                    SIFTRegistrationAlgorithm(outlier_removal_method='trial_error', boundary_exclusion_length=16,
-                                              tol=tols[i], min_roi_stddev=min_roi_stddev))
+                self.alg_list.append(SIFTRegistrationAlgorithm(configs))
+            self.alg_list[i].tol = configs.hybrid_registration_tols[i]
 
     def run(self, previous, current, *args, **kwargs):
         offset = None
@@ -156,23 +145,15 @@ class HybridRegistrationAlgorithm(RegistrationAlgorithm):
 
 
 class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
-    def __init__(self, max_shift=7, subpixel=True, n_levels=1, starting_max_shift=30,
-                 subpixel_fitting_window_size=5, subpixel_diff_tolerance=2, downsample=1,
-                 use_fast_errormap=False, subpixel_fitting_check_coefficients=True,
-                 errormap_error_check_tol=0.3, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.max_shift = max_shift
+    def __init__(self, configs: RegistrationConfigDict, *args, **kwargs):
+        super().__init__(configs, *args, **kwargs)
+        starting_max_shift = 30
+        self.configs = configs
+        self.max_shift = configs.max_shift
         self.starting_max_shift = min(self.max_shift, starting_max_shift)
         self.drift_threshold = 60
-        self.subpixel = subpixel
         self.error_map = None
-        self.n_levels = n_levels
-        self.subpixel_fitting_window_size = subpixel_fitting_window_size
-        self.subpixel_diff_tolerance = subpixel_diff_tolerance
-        self.downsample = downsample
-        self.use_fast_errormap = use_fast_errormap
-        self.errormap_error_check_tol = errormap_error_check_tol
-        self.subpixel_fitting_check_coefficients = subpixel_fitting_check_coefficients
+        self.n_levels = 1
 
     def run(self, previous, current, *args, **kwargs):
         if self.n_levels == 1:
@@ -223,18 +204,19 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
         return offset
 
     def run_expandable(self, previous, current, *args, **kwargs):
-        if self.downsample > 1:
-            previous = ndi.zoom(previous, 1. / self.downsample)
-            current = ndi.zoom(current, 1. / self.downsample)
-            self.starting_max_shift = int(self.starting_max_shift / self.downsample)
-            self.max_shift = int(self.max_shift / self.downsample)
+        ds = self.configs.registration_downsample
+        if ds > 1:
+            previous = ndi.zoom(previous, 1. / ds)
+            current = ndi.zoom(current, 1. / ds)
+            self.starting_max_shift = int(self.starting_max_shift / ds)
+            self.max_shift = int(self.max_shift / ds)
         self.status = self.status_dict['ok']
         offset = None
         current_max_shift = self.starting_max_shift
         offset = [np.inf, np.inf]
         while (self.status in [self.status_dict['ok'], self.status_dict['questionable']] and
                current_max_shift <= self.max_shift):
-            if not self.use_fast_errormap:
+            if not self.configs.use_fast_errormap:
                 offset, coeffs, min_error = self.run_with_current_max_shift(previous, current,
                                                                             current_max_shift)
             else:
@@ -247,7 +229,7 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
                 current_max_shift += 10
             else:
                 current_max_shift = min(current_max_shift + 10, self.max_shift)
-                if self.subpixel:
+                if self.configs.do_subpixel:
                     logging.debug(
                         'Result failed quality check, so I am increasing max shift to {}. (offset = {}, a = {}, '
                         'b = {}, min_error = {})'.format(current_max_shift, offset, *coeffs[:2], min_error))
@@ -256,7 +238,7 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
                                 'min_error = {})'.format(current_max_shift, offset, min_error))
         self.check_offset(offset)
         self.check_offset_quality(previous, current, offset, tol=self.tol, min_roi_stddev=self.min_roi_stddev)
-        return offset * self.downsample
+        return offset * ds
 
     def run_with_current_max_shift_fast(self, previous, current, max_shift=None, y_range=None, x_range=None):
         if max_shift is not None:
@@ -317,11 +299,11 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
         min_error = np.min(result_table[:, 2])
         i_min_error = np.argmin(result_table[:, 2])
         int_offset = result_table[i_min_error, :2]
-        if self.subpixel:
+        if self.configs.do_subpixel:
             offset, coeffs = self.__class__._fit_quadratic_peak_in_error_map(result_table, return_coeffs=True,
-                    window_size=self.subpixel_fitting_window_size)
+                    window_size=self.configs.subpixel_fitting_window_size)
             # Reject fitting result if too far from integer solution
-            if not np.all(np.abs(offset - int_offset) < self.subpixel_diff_tolerance):
+            if not np.all(np.abs(offset - int_offset) < self.configs.subpixel_diff_tolerance):
                 logging.debug('Rejected quadratic fitting because it is too far away from integer solution.')
                 offset = int_offset
             # Probe position offset is opposite to image offset.
@@ -344,12 +326,12 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
             return offset, None, min_error
 
     def check_fitting_result(self, coeffs, min_error):
-        if self.subpixel and self.subpixel_fitting_check_coefficients:
+        if self.configs.do_subpixel and self.configs.subpixel_fitting_check_coefficients:
             a, b = coeffs[:2]
             if a < 1e-3 or b < 1e-3:
                 self.status = self.status_dict['questionable']
                 return
-        min_error_tol = self.errormap_error_check_tol if self.errormap_error_check_tol is not None else self.tol
+        min_error_tol = self.configs.errormap_error_check_tol if self.configs.errormap_error_check_tol is not None else self.tol
         if min_error > min_error_tol:
             self.status = self.status_dict['questionable']
             return
@@ -410,22 +392,13 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
 
 
 class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
-    def __init__(self, *args, outlier_removal_method='kmeans', initial_crop_ratio=1, boundary_exclusion_length=16,
-                 downsample=1, **kwargs):
+    def __init__(self, configs: RegistrationConfigDict, **kwargs):
         """
         SIFT registration.
-
-        :param outlier_removal_method: str. Can be 'trial_error', 'kmeans', 'isoforest', 'ransac'.
-        :param boundary_exclusion_length: int. The length of the near-boundary region of the image. When doing
-               SIFT registration, if a matching pair of keypoints involve points in this region, it will be discarded.
-               However, if all matches (after outlier removal) are near-boundary, they are used as they are.
-        :param downsample: int. Downsampling ratio.
         """
-        super().__init__(*args, **kwargs)
-        self.outlier_removal_method = outlier_removal_method
-        self.initial_crop_ratio = initial_crop_ratio
-        self.boundary_exclusion_length = boundary_exclusion_length
-        self.downsample = downsample
+        super().__init__(configs, **kwargs)
+        self.configs = configs
+        self.initial_crop_ratio = 1
 
     def find_keypoints(self, previous, current):
         feature_extractor = skimage.feature.SIFT(n_octaves=8, upsampling=1, n_scales=3, sigma_in=0.8, sigma_min=1.2)
@@ -444,9 +417,9 @@ class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
         return matches, matched_points_prev, matched_points_curr
 
     def run(self, previous, current, *args, **kwargs):
-        if self.downsample > 1:
-            previous = ndi.zoom(previous, 1. / self.downsample)
-            current = ndi.zoom(current, 1. / self.downsample)
+        if self.configs.registration_downsample > 1:
+            previous = ndi.zoom(previous, 1. / self.configs.registration_downsample)
+            current = ndi.zoom(current, 1. / self.configs.registration_downsample)
         matched_points_prev = []
         matched_points_curr = []
         matches = []
@@ -500,7 +473,7 @@ class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
         # Remove near-edge pairs. If all pairs are near-edge, just use them as they are.
         # matches_0 = copy.copy(matches)
         non_remote_inds, ss = self.find_non_remote_pairs(matched_points_prev, matched_points_curr, previous.shape,
-                                                         boundary_len=self.boundary_exclusion_length)
+                                                         boundary_len=self.configs.sift_border_exclusion_length)
         matched_points_prev = matched_points_prev[non_remote_inds]
         matched_points_curr = matched_points_curr[non_remote_inds]
         matches = matches[non_remote_inds]
@@ -516,8 +489,8 @@ class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
         # plt.show()
 
 
-        if self.downsample > 1:
-            offset = offset * self.downsample
+        if self.configs.registration_downsample > 1:
+            offset = offset * self.configs.registration_downsample
 
         return offset
 
@@ -578,19 +551,19 @@ class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
         
     def find_majority_pairs(self, matched_points_prev, matched_points_curr,
                             prev_image=None, current_image=None, *args, **kwargs):
-        if self.outlier_removal_method == 'kmeans':
+        if self.configs.sift_outlier_removal_method == 'kmeans':
             majority_inds, res = self.find_majority_pairs_kmeans(matched_points_prev, matched_points_curr)
-        elif self.outlier_removal_method == 'isoforest':
+        elif self.configs.sift_outlier_removal_method == 'isoforest':
             majority_inds, res = self.find_majority_pairs_isoforest(matched_points_prev, matched_points_curr)
-        elif self.outlier_removal_method == 'ransac':
+        elif self.configs.sift_outlier_removal_method == 'ransac':
             majority_inds, res = self.find_majority_pairs_ransac(matched_points_prev, matched_points_curr,
                                                                  *args, **kwargs)
-        elif self.outlier_removal_method == 'trial_error':
+        elif self.configs.sift_outlier_removal_method == 'trial_error':
             majority_inds, res = self.find_majority_pairs_trial_error(matched_points_prev, matched_points_curr,
                                                                       prev_image, current_image,
                                                                       *args, **kwargs)
         else:
-            raise ValueError('{} is not a valid method. '.format(self.outlier_removal_method))
+            raise ValueError('{} is not a valid method. '.format(self.configs.sift_outlier_removal_method))
         return majority_inds, res
 
     def find_majority_pairs_isoforest(self, matched_points_prev, matched_points_curr):

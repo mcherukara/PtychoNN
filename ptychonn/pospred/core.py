@@ -7,7 +7,7 @@ from tqdm import trange, tqdm
 import matplotlib.pyplot as plt
 import sklearn.neighbors
 
-from ptychonn.pospred.configs import InferenceConfigDict
+from ptychonn.pospred.configs import ConfigDict, InferenceConfigDict
 from ptychonn.pospred.reconstructor import VirtualReconstructor
 from ptychonn.pospred.io import create_data_file_handle, VirtualDataFileHandle
 from ptychonn.pospred.position_list import ProbePositionList
@@ -119,28 +119,6 @@ class PtychoNNProbePositionCorrector:
         self.row_index_list = []
         self.unregistered_indices = []
 
-    def get_registrator_arguments_from_config_dict(self):
-        kwargs = {
-            'method': self.config_dict.registration_method,
-            'max_shift': self.config_dict.max_shift,
-            'random_seed': self.config_dict.random_seed,
-            'subpixel': self.config_dict.do_subpixel,
-            'outlier_removal_method': self.config_dict.sift_outlier_removal_method,
-            'boundary_exclusion_length': self.config_dict.sift_border_exclusion_length,
-            'downsample': self.config_dict.registration_downsample,
-            'algs': self.config_dict.hybrid_registration_algs,
-            'tols': self.config_dict.hybrid_registration_tols,
-            'tol': self.config_dict.nonhybrid_registration_tol,
-            'min_roi_stddev': self.config_dict.min_roi_stddev,
-            'use_baseline_offsets_for_uncertain_pairs': self.config_dict.use_baseline_offsets_for_uncertain_pairs,
-            'subpixel_fit_window_size': self.config_dict.subpixel_fitting_window_size,
-            'subpixel_diff_tolerance': self.config_dict.subpixel_diff_tolerance,
-            'use_fast_errormap': self.config_dict.use_fast_errormap,
-            'subpixel_fitting_check_coefficients': self.config_dict.subpixel_fitting_check_coefficients,
-            'errormap_error_check_tol': self.config_dict.errormap_error_check_tol
-        }
-        return kwargs
-
     def build(self):
         if self.config_dict.random_seed is not None:
             logging.debug('Random seed is set to {}.'.format(self.config_dict.random_seed))
@@ -175,9 +153,10 @@ class PtychoNNProbePositionCorrector:
             self.orig_probe_positions = self.config_dict.probe_position_list
         self.new_probe_positions = self.orig_probe_positions.copy_with_zeros()
 
-        self.registrator = Registrator(**self.get_registrator_arguments_from_config_dict())
+        self.registrator = Registrator(self.config_dict.registration_params, random_seed=self.config_dict.random_seed)
 
-        if self.config_dict.rectangular_grid and self.config_dict.use_baseline_offsets_for_points_on_same_row:
+        if (self.config_dict.rectangular_grid and
+                self.config_dict.registration_params.use_baseline_offsets_for_points_on_same_row):
             self.build_row_index_list()
 
     def build_row_index_list(self):
@@ -246,7 +225,7 @@ class PtychoNNProbePositionCorrector:
         for ind in trange(1, self.n_dps):
             current_obj = self.reconstruct_dp(ind)[1][0]
             offset = self.registrator.run(previous_obj, current_obj)
-            if self.config_dict.use_baseline_offsets_for_uncertain_pairs and \
+            if self.config_dict.registration_params.use_baseline_offsets_for_uncertain_pairs and \
                     self.registrator.get_status() == self.registrator.get_status_code('empty'):
                 offset = self.orig_probe_positions.array[ind] - self.orig_probe_positions.array[ind - 1]
             elif self.registrator.get_status() == self.registrator.get_status_code('bad'):
@@ -298,8 +277,10 @@ class PtychoNNProbePositionCorrector:
         nn_engine.fit(self.orig_probe_positions.array)
         nn_dists, nn_inds = nn_engine.kneighbors(self.orig_probe_positions.array)
         for i_dp, this_orig_pos in enumerate(tqdm(self.orig_probe_positions.array)):
-            if self.config_dict.registration_tol_schedule:
-                self.registrator.update_tol_by_tol_schedule(i_dp, self.config_dict.registration_tol_schedule)
+            if self.config_dict.registration_params.registration_tol_schedule:
+                self.registrator.update_tol_by_tol_schedule(
+                    i_dp, self.config_dict.registration_params.registration_tol_schedule
+                )
             this_knn_inds = nn_inds[i_dp, 1:]
             this_neighbors_inds = self.get_neightbor_inds(i_dp, this_knn_inds)
 
@@ -315,7 +296,7 @@ class PtychoNNProbePositionCorrector:
                 neighbor_obj = self.reconstruct_dp(dp=self.dp_data_fhdl.get_dp_by_raw_index(ind_neighbor),
                                                    ind=ind_neighbor)[1][0]
 
-                if self.config_dict.use_baseline_offsets_for_points_on_same_row \
+                if self.config_dict.registration_params.use_baseline_offsets_for_points_on_same_row \
                         and self.row_index_list is not None \
                         and self.row_index_list[i_dp] == self.row_index_list[ind_neighbor]:
                     logging.debug('DP {} and {} are on the same row, so using baseline offset for this pair.'.format(
@@ -335,7 +316,7 @@ class PtychoNNProbePositionCorrector:
                         plt.show()
                         plt.tight_layout()
                         print('Offset: {}'.format(offset))
-                if self.config_dict.use_baseline_offsets_for_uncertain_pairs and \
+                if self.config_dict.registration_params.use_baseline_offsets_for_uncertain_pairs and \
                         self.registrator.get_status() == self.registrator.get_status_code('empty'):
                     offset = self.orig_probe_positions.array[i_dp] - self.orig_probe_positions.array[ind_neighbor]
                 # We want to be more strict with collective mode. If a result is less confident, just skip it.
@@ -347,7 +328,7 @@ class PtychoNNProbePositionCorrector:
                     self.a_mat.append(self._generate_amat_row(i_dp, ind_neighbor))
         self.a_mat = np.stack(self.a_mat)
         self.b_vec = np.stack(self.b_vec)
-        if self.config_dict.use_baseline_offsets_for_unregistered_points:
+        if self.config_dict.registration_params.use_baseline_offsets_for_unregistered_points:
             self.fill_gaps_in_linear_system()
 
     def fill_gaps_in_linear_system(self):
@@ -392,7 +373,7 @@ class PtychoNNProbePositionCorrector:
             self.new_probe_positions.array = np.linalg.pinv(a_mat) @ b_vec
 
     def postprocess(self):
-        if self.config_dict.use_baseline_offsets_for_unregistered_points:
+        if self.config_dict.registration_params.use_baseline_offsets_for_unregistered_points:
             for ind in self.unregistered_indices:
                 if ind > 0:
                     baseline_offset = self.orig_probe_positions.array[ind] - self.orig_probe_positions.array[ind - 1]
@@ -437,18 +418,25 @@ class ProbePositionCorrectorChain:
         self.collective_mode_offset_tol = 150
         self.verbose = True
         self.redone_with_baseline = False
+        self.has_multiiter_key = False
 
     def build(self):
         self.build_multiiter_entries()
 
-    def build_multiiter_entries(self):
-        has_multiiter_key = False
-        for key in self.config_dict.__dict__.keys():
+    def find_multiiter_keys(self, config_obj):
+        for key in config_obj.__dict__.keys():
             if 'multiiter' in key:
-                self.n_iters = len(self.config_dict.__dict__[key])
+                self.n_iters = len(config_obj.__dict__[key])
                 self.multiiter_keys.append(key)
-                has_multiiter_key = True
-        if not has_multiiter_key:
+                self.has_multiiter_key = True
+        for key, value in config_obj.__dict__.items():
+            if isinstance(value, ConfigDict):
+                self.find_multiiter_keys(value)
+
+    def build_multiiter_entries(self):
+        self.has_multiiter_key = False
+        self.find_multiiter_keys(self.config_dict)
+        if not self.has_multiiter_key:
             raise ValueError('With ProbePositionCorrectorChain, there should be at least one entry in the config dict '
                              'that ends with "_multiiter" and is a list whose length equals to the desired number of '
                              'iterations. ')
@@ -498,7 +486,7 @@ class ProbePositionCorrectorChain:
     def update_config_dict(self, iter, initialize_with_baseline=False):
         for mikey in self.multiiter_keys:
             key = self.get_ordinary_key_name(mikey)
-            self.config_dict.__dict__[key] = self.config_dict.__dict__[mikey][iter]
+            self.config_dict.overwrite_value_to_key(self.config_dict, key, self.config_dict.query(mikey)[iter])
         if iter > 0:
             last_corrector = self.corrector_list[iter - 1]
             last_probe_pos_array = last_corrector.new_probe_positions.array

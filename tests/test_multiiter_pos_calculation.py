@@ -3,7 +3,7 @@ import logging
 import numpy as np
 
 import ptychonn.pospred
-from ptychonn.pospred.configs import InferenceConfigDict
+from ptychonn.pospred.configs import InferenceConfigDict, RegistrationConfigDict
 from ptychonn.pospred.core import ProbePositionCorrectorChain
 from ptychonn.pospred.position_list import ProbePositionList
 
@@ -24,6 +24,9 @@ def test_multiiter_pos_calculation():
         # where arr is a [N, 2] array of probe positions in pixel.
         central_crop=None,
         num_neighbors_collective=4,
+        registration_params=RegistrationConfigDict(
+            registration_method='hybrid'
+        )
     )
     # One can use different values for a config key at different iterations. To do this, create dict keys in the
     # config object with a name of "<existing_config_ket_name>_multiiter". For example:
