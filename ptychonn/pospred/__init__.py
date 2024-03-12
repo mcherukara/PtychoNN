@@ -56,6 +56,13 @@ corrector_chain.run()
 ```
 Predicted positions can be obtained from `corrector_chain.corrector_list[-1].new_probe_positions.array`.
 
+### Examples
+
+`tests/test_multiiter_pos_calculation.py` shows an example of a 3-iteration position prediction run
+with images already predicted by PtychoNN. The script demonstrates a case without any initial position
+input; however, if an initial position set is desired, one can provide that through the
+`position_list` key of the config object. See comments in the config object constructor inside the script.
+
 **References**
 
 1. M. J. Cherukara, T. Zhou, Y. Nashed, P. Enfedaque, A. Hexemer, R. J. Harder, M. V. Holt, AI-enabled high-resolution scanning coherent diffraction imaging. Appl Phys Lett 117, 044103 (2020).
