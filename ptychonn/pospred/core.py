@@ -211,7 +211,7 @@ class PtychoNNProbePositionCorrector:
             if dp is None:
                 dp = self.dp_data_fhdl.get_dp_by_consecutive_index(ind)
             obj_amp, obj_ph = self.ptycho_reconstructor.batch_infer(dp[np.newaxis, :, :])
-        # if self.config_dict.method:
+        # if self.config_dict.debug:
         #     fig, ax = plt.subplots(1, 3)
         #     ax[0].imshow(dp)
         #     ax[0].set_title('DP')
@@ -252,7 +252,7 @@ class PtychoNNProbePositionCorrector:
             elif self.registrator.get_status() == self.registrator.get_status_code('bad'):
                 offset = offset_tracker.estimate()
                 self.count_bad_offset += 1
-            if self.config_dict.method:
+            if self.config_dict.debug:
                 fig, ax = plt.subplots(1, 2)
                 ax[0].imshow(previous_obj)
                 ax[1].imshow(current_obj)
@@ -325,7 +325,7 @@ class PtychoNNProbePositionCorrector:
                 else:
                     offset = self.registrator.run(neighbor_obj, current_obj)
                     # print('{} - {}: {}'.format(i_dp, ind_neighbor, offset))
-                    if self.config_dict.method and self.registrator.get_status() != self.registrator.get_status_code('empty'):
+                    if self.config_dict.debug and self.registrator.get_status() != self.registrator.get_status_code('empty'):
                         fig, ax = plt.subplots(1, 2)
                         im = ax[0].imshow(neighbor_obj, vmin=-0.2, vmax=0.2)
                         plt.colorbar(im)
