@@ -1,3 +1,4 @@
+import logging
 import collections
 
 import numpy as np
@@ -11,7 +12,6 @@ from ptychonn.pospred.reconstructor import VirtualReconstructor
 from ptychonn.pospred.io import create_data_file_handle, VirtualDataFileHandle
 from ptychonn.pospred.position_list import ProbePositionList
 from ptychonn.pospred.registrator import Registrator
-from ptychonn.pospred.message_logger import logger
 
 
 class OffsetEstimator:
@@ -145,7 +145,7 @@ class PtychoNNProbePositionCorrector:
 
     def build(self):
         if self.config_dict.random_seed is not None:
-            logger.debug('Random seed is set to {}.'.format(self.config_dict.random_seed))
+            logging.debug('Random seed is set to {}.'.format(self.config_dict.random_seed))
             np.random.seed(self.config_dict.random_seed)
 
         if self.config_dict.reconstruction_image_path is not None and \
@@ -320,7 +320,7 @@ class PtychoNNProbePositionCorrector:
                 if self.config_dict.use_baseline_offsets_for_points_on_same_row \
                         and self.row_index_list is not None \
                         and self.row_index_list[i_dp] == self.row_index_list[ind_neighbor]:
-                    logger.debug('DP {} and {} are on the same row, so using baseline offset for this pair.'.format(
+                    logging.debug('DP {} and {} are on the same row, so using baseline offset for this pair.'.format(
                         i_dp, ind_neighbor))
                     offset = self.orig_probe_positions.array[i_dp] - self.orig_probe_positions.array[ind_neighbor]
                     self.registrator.algorithm.status = self.registrator.get_status_code('ok')
@@ -460,7 +460,7 @@ class ProbePositionCorrectorChain:
             self.run_correction_iteration(iter)
 
     def run_correction_iteration(self, iter):
-        logger.debug('Now running iteration {}.'.format(iter))
+        logging.debug('Now running iteration {}.'.format(iter))
         self.update_config_dict(iter)
         if self.verbose:
             print(self.config_dict)
@@ -471,7 +471,7 @@ class ProbePositionCorrectorChain:
         corrector.run()
         if self.config_dict.method == 'collective' and (not self.is_collective_result_good(corrector)):
             # Redo iteration using baseline as initialization if result is bad
-            logger.debug('The current iteration is using collective mode and the result is unreliable. Attempting to '
+            logging.debug('The current iteration is using collective mode and the result is unreliable. Attempting to '
                         'redo this iteration with baseline positions as initialization...')
             if self.baseline_pos_list:
                 self.config_dict.probe_position_list = self.baseline_pos_list
@@ -480,7 +480,7 @@ class ProbePositionCorrectorChain:
                 corrector.run()
                 self.redone_with_baseline = True
             else:
-                logger.debug('Baseline position is unavailable.')
+                logging.debug('Baseline position is unavailable.')
         self.corrector_list.append(corrector)
         if self.verbose:
             corrector.new_probe_positions.plot()
@@ -511,4 +511,4 @@ class ProbePositionCorrectorChain:
                 else:
                     raise ValueError('Cannot initialize with baseline positions: baseline position list is None.')
             self.config_dict.probe_position_list = probe_pos_list
-            logger.debug('Using result from the last iteration to initialize probe position array...')
+            logging.debug('Using result from the last iteration to initialize probe position array...')

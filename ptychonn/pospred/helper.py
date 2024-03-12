@@ -1,3 +1,4 @@
+import logging
 try:
     import pycuda.driver as cuda
     import tensorrt as trt
@@ -7,7 +8,6 @@ except ImportError:
 from skimage.transform import resize
 import numpy as np
 
-from ptychonn.pospred.message_logger import logger
 
 
 def engine_build_from_onnx(onnx_mdl):
@@ -36,9 +36,9 @@ def mem_allocation(engine):
     Determine dimensions and create page-locked memory buffers (i.e. won't be swapped to disk) to hold host
     inputs/outputs.
     """
-    logger.debug('Expected input node shape is {}'.format(engine.get_binding_shape(0)))
+    logging.debug('Expected input node shape is {}'.format(engine.get_binding_shape(0)))
     in_sz = trt.volume(engine.get_binding_shape(0)) * engine.max_batch_size
-    logger.debug('Input size: {}'.format(in_sz))
+    logging.debug('Input size: {}'.format(in_sz))
     h_input = cuda.pagelocked_empty(in_sz, dtype='float32')
     
     out_sz = trt.volume(engine.get_binding_shape(1)) * engine.max_batch_size
@@ -117,6 +117,6 @@ def correct_overflow(arr):
     vals = arr[mask]
     vals = 32768 + (vals - -32768)
     arr[mask] = vals
-    # logger.debug('{} overflowing values corrected.'.format(np.count_nonzero(mask)))
+    # logging.debug('{} overflowing values corrected.'.format(np.count_nonzero(mask)))
     return arr
 

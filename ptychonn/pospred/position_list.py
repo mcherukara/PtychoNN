@@ -6,7 +6,6 @@ import matplotlib
 
 from ptychonn.pospred.io import load_probe_positions_from_file, save_positions_to_csv
 
-
 class ProbePositionList:
     def __init__(self, file_path=None, position_list=None, unit='pixel', psize_nm=None, convert_to_pixel=True,
                  first_is_x=False):

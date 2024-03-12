@@ -11,8 +11,6 @@ import scipy.ndimage as ndi
 import scipy.signal
 import skimage
 
-from ptychonn.pospred.message_logger import logger
-
 
 class Registrator:
 
@@ -49,7 +47,7 @@ class Registrator:
                 self.kwargs['use_baseline_offsets_for_uncertain_pairs']:
             if ((not self.has_registratable_features(previous, std_threshold=0.003, abs_threshold=0.2)) or
                     (not self.has_registratable_features(current, std_threshold=0.003, abs_threshold=0.2))):
-                logger.debug('One or both images appear to be empty. Using baseline offset for this pair.')
+                logging.debug('One or both images appear to be empty. Using baseline offset for this pair.')
                 self.algorithm.status = self.algorithm.status_dict['empty']
                 return np.array([0, 0])
         offset = self.algorithm.run(previous, current)
@@ -72,7 +70,7 @@ class Registrator:
             new_tol = tol_schedule[i_stage, 1]
             if np.abs(self.algorithm.tol - new_tol) > 1e-8:
                 self.update_tol(new_tol)
-                logger.debug('Updated tol to {}.'.format(new_tol))
+                logging.debug('Updated tol to {}.'.format(new_tol))
 
     def update_tol(self, new_tol):
         self.kwargs['tol'] = new_tol
@@ -98,13 +96,13 @@ class RegistrationAlgorithm:
         sy, sx, ey, ex = self.calculate_metric_region_for_shifted_image(offset, prev.shape)
         error = np.mean((prev_shifted[sy:ey, sx:ex] - curr[sy:ey, sx:ex]) ** 2)
         if error > tol and update_status:
-            logger.debug('Large error after applying offset ({}).'.format(error))
+            logging.debug('Large error after applying offset ({}).'.format(error))
             self.status = self.status_dict['bad']
         else:
             # There should be enough variance in the analysis region for the result to be reliable.
             std_roi = np.std(curr[sy:ey, sx:ex])
             if std_roi < min_roi_stddev:
-                logger.debug('Error is low ({}) but stddev is also low within the ROI ({}; threshold: {}).'.format(
+                logging.debug('Error is low ({}) but stddev is also low within the ROI ({}; threshold: {}).'.format(
                     error, std_roi, min_roi_stddev))
                 self.status = self.status_dict['questionable']
         return error
@@ -153,7 +151,7 @@ class HybridRegistrationAlgorithm(RegistrationAlgorithm):
             if self.status == self.status_dict['ok']:
                 return offset
             if i < len(self.alg_list) - 1:
-                logger.debug('Switching to {}...'.format(self.alg_names[i + 1]))
+                logging.debug('Switching to {}...'.format(self.alg_names[i + 1]))
         return offset
 
 
@@ -218,7 +216,7 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
                 finish = True
             else:
                 current_max_shift += 10
-                logger.debug(
+                logging.debug(
                     'Multilevel result failed quality check, so I am increasing max shift to {}.'.format(
                         current_max_shift)
                 )
@@ -250,11 +248,11 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
             else:
                 current_max_shift = min(current_max_shift + 10, self.max_shift)
                 if self.subpixel:
-                    logger.debug(
+                    logging.debug(
                         'Result failed quality check, so I am increasing max shift to {}. (offset = {}, a = {}, '
                         'b = {}, min_error = {})'.format(current_max_shift, offset, *coeffs[:2], min_error))
                 else:
-                    logger.debug('Result failed quality check, so I am increasing max shift to {}. (offset = {}, '
+                    logging.debug('Result failed quality check, so I am increasing max shift to {}. (offset = {}, '
                                 'min_error = {})'.format(current_max_shift, offset, min_error))
         self.check_offset(offset)
         self.check_offset_quality(previous, current, offset, tol=self.tol, min_roi_stddev=self.min_roi_stddev)
@@ -324,7 +322,7 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
                     window_size=self.subpixel_fitting_window_size)
             # Reject fitting result if too far from integer solution
             if not np.all(np.abs(offset - int_offset) < self.subpixel_diff_tolerance):
-                logger.debug('Rejected quadratic fitting because it is too far away from integer solution.')
+                logging.debug('Rejected quadratic fitting because it is too far away from integer solution.')
                 offset = int_offset
             # Probe position offset is opposite to image offset.
             offset = -np.array(offset)
@@ -360,7 +358,7 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
     def check_offset(self, offset):
         if np.count_nonzero(abs(np.array(offset)) > self.drift_threshold):
             self.status = self.status_dict['bad']
-            logger.debug('Offset magnitude is very large ({}), which might be unreliable. '.format(offset))
+            logging.debug('Offset magnitude is very large ({}), which might be unreliable. '.format(offset))
         else:
             self.status = self.status_dict['ok']
 
@@ -402,7 +400,7 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
         y_min += (window_offset[0] + shift_range_y[0])
         x_min += (window_offset[1] + shift_range_x[0])
         if abs(y_min) > 100 or abs(x_min) > 100:
-            logger.debug('A suspiciously large offset was detected ({}, {}). If this does not seem normal, the search '
+            logging.debug('A suspiciously large offset was detected ({}, {}). If this does not seem normal, the search '
                           'range is likely too small which caused the result to diverge. Adjust the search range above '
                           'the largest possible offset. \nSolved quadratic coefficients: {}.'.format(
                 y_min, x_min, x_vec))
@@ -469,7 +467,7 @@ class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
                 matches, matched_points_prev, matched_points_curr = self.find_matches(keypoints_prev, keypoints_curr,
                                                                                       descriptors_prev, descriptors_curr)
                 if len(matches) < 2 and not is_full_size:
-                    logger.debug('Could not find enough matches with crop ratio {}. Using full-sized images '
+                    logging.debug('Could not find enough matches with crop ratio {}. Using full-sized images '
                                 'instead...'.format(self.initial_crop_ratio))
                     cropped_previous = previous
                     cropped_current = current
@@ -652,7 +650,7 @@ class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
             else:
                 good_inds = []
         if len(good_inds) == 0:
-            logger.debug('Trial-error did not return any good candidates, thus switching to KMeans.')
+            logging.debug('Trial-error did not return any good candidates, thus switching to KMeans.')
             self.status = self.status_dict['questionable']
             good_inds, res = self.find_majority_pairs_kmeans(matched_points_prev, matched_points_curr)
         return good_inds, error_list
@@ -690,9 +688,9 @@ class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
         counts = np.sort(counts)
         if len(counts) > 1 and (counts[-1] - counts[-2]) / counts[-2] < 0.3:
             self.status = self.status_dict['questionable']
-            logger.debug('Non-dominating majority cluster: {} vs {}'.format(counts[-1], counts[-2]))
+            logging.debug('Non-dominating majority cluster: {} vs {}'.format(counts[-1], counts[-2]))
             return
         if counts[-1] < 4:
             self.status = self.status_dict['questionable']
-            logger.debug('Too few majority matches ({}).'.format(counts[-1]))
+            logging.debug('Too few majority matches ({}).'.format(counts[-1]))
             return

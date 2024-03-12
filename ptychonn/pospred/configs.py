@@ -10,8 +10,16 @@ except:
 
 
 @dataclasses.dataclass
-
 class ConfigDict:
+
+    def __str__(self, *args, **kwargs):
+        s = ''
+        for key in self.__dict__.keys():
+            s += '{}: {}\n'.format(key, self.__dict__[key])
+        return s
+
+    def __repr__(self):
+        return self.__str__()
 
     @staticmethod
     def is_jsonable(x):
@@ -64,7 +72,6 @@ class ConfigDict:
 
 
 @dataclasses.dataclass
-
 class InferenceConfigDict(ConfigDict):
 
     # ===== PtychoNN configs =====
@@ -76,7 +83,6 @@ class InferenceConfigDict(ConfigDict):
 
     model: Any = None
     """
-
 
     The model. Should be a tuple(nn.Module, kwargs): the first element of the tuple is the class handle of a
     model class, and the second is a dictionary of keyword arguments. The model will be instantiated using these.
@@ -219,7 +225,6 @@ class InferenceConfigDict(ConfigDict):
 
     debug: bool = False
 
-
 class TrainingConfigDict(ConfigDict):
     batch_size_per_process: int = 64
 
@@ -228,7 +233,6 @@ class TrainingConfigDict(ConfigDict):
     learning_rate_per_process: float = 1e-3
 
     optimizer: str = 'adam'
-
     """String of optimizer name or the handle of a subclass of torch.optim.Optimizer"""
 
     model_save_dir: str = '.'
@@ -248,7 +252,6 @@ class TrainingConfigDict(ConfigDict):
     l1_weight: float = 0
 
     tv_weight: float = 0
-
 
 class PtychoNNTrainingConfigDict(TrainingConfigDict):
     height: int = 256

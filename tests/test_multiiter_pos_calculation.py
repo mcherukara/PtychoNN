@@ -1,11 +1,14 @@
 import os
-
+import logging
 import numpy as np
 
 import ptychonn.pospred
 from ptychonn.pospred.configs import InferenceConfigDict
 from ptychonn.pospred.core import ProbePositionCorrectorChain
 from ptychonn.pospred.position_list import ProbePositionList
+
+
+logging.basicConfig(format='[%(asctime)s] %(message)s', level=logging.INFO)
 
 
 def test_multiiter_pos_calculation():
