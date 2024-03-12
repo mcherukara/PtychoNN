@@ -111,9 +111,7 @@ class PtychoNNProbePositionCorrector:
         self.orig_probe_positions = None
         self.new_probe_positions = None
         self.n_dps = 0
-        self.debug = self.config_dict.debug
         self.registrator = None
-        self.method = self.config_dict.method
         self.lmbda_collective = 1e-6
         self.a_mat = np.array([])
         self.b_vec = np.array([])
@@ -197,12 +195,12 @@ class PtychoNNProbePositionCorrector:
         self.row_index_list = np.array(row_inds)
 
     def run(self):
-        if self.method == 'serial':
+        if self.config_dict.method == 'serial':
             self.run_probe_position_correction_serial()
-        elif self.method == 'collective':
+        elif self.config_dict.method == 'collective':
             self.run_probe_position_correction_collective()
         else:
-            raise ValueError('Correction method {} is not supported. '.format(self.method))
+            raise ValueError('Correction method {} is not supported. '.format(self.config_dict.method))
 
     def reconstruct_dp(self, ind=None, dp=None):
         if isinstance(self.ptycho_reconstructor, VirtualReconstructor):
@@ -213,7 +211,7 @@ class PtychoNNProbePositionCorrector:
             if dp is None:
                 dp = self.dp_data_fhdl.get_dp_by_consecutive_index(ind)
             obj_amp, obj_ph = self.ptycho_reconstructor.batch_infer(dp[np.newaxis, :, :])
-        # if self.debug:
+        # if self.config_dict.method:
         #     fig, ax = plt.subplots(1, 3)
         #     ax[0].imshow(dp)
         #     ax[0].set_title('DP')
@@ -254,7 +252,7 @@ class PtychoNNProbePositionCorrector:
             elif self.registrator.get_status() == self.registrator.get_status_code('bad'):
                 offset = offset_tracker.estimate()
                 self.count_bad_offset += 1
-            if self.debug:
+            if self.config_dict.method:
                 fig, ax = plt.subplots(1, 2)
                 ax[0].imshow(previous_obj)
                 ax[1].imshow(current_obj)
@@ -327,7 +325,7 @@ class PtychoNNProbePositionCorrector:
                 else:
                     offset = self.registrator.run(neighbor_obj, current_obj)
                     # print('{} - {}: {}'.format(i_dp, ind_neighbor, offset))
-                    if self.debug and self.registrator.get_status() != self.registrator.get_status_code('empty'):
+                    if self.config_dict.method and self.registrator.get_status() != self.registrator.get_status_code('empty'):
                         fig, ax = plt.subplots(1, 2)
                         im = ax[0].imshow(neighbor_obj, vmin=-0.2, vmax=0.2)
                         plt.colorbar(im)
