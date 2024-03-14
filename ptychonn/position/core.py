@@ -7,11 +7,11 @@ from tqdm import trange, tqdm
 import matplotlib.pyplot as plt
 import sklearn.neighbors
 
-from ptychonn.pospred.configs import ConfigDict, InferenceConfigDict
-from ptychonn.pospred.reconstructor import VirtualReconstructor
-from ptychonn.pospred.io import create_data_file_handle, VirtualDataFileHandle
-from ptychonn.pospred.position_list import ProbePositionList
-from ptychonn.pospred.registrator import Registrator
+from ptychonn.position.configs import ConfigDict, InferenceConfigDict
+from ptychonn.position.reconstructor import VirtualReconstructor
+from ptychonn.position.io import create_data_file_handle, VirtualDataFileHandle
+from ptychonn.position.position_list import ProbePositionList
+from ptychonn.position.registrator import Registrator
 
 
 class OffsetEstimator:

@@ -2,10 +2,10 @@ import os
 import logging
 import numpy as np
 
-import ptychonn.pospred
-from ptychonn.pospred.configs import InferenceConfigDict, RegistrationConfigDict
-from ptychonn.pospred.core import ProbePositionCorrectorChain
-from ptychonn.pospred.position_list import ProbePositionList
+import ptychonn.position
+from ptychonn.position.configs import InferenceConfigDict, RegistrationConfigDict
+from ptychonn.position.core import ProbePositionCorrectorChain
+from ptychonn.position.position_list import ProbePositionList
 
 
 logging.basicConfig(format='[%(asctime)s] %(message)s', level=logging.INFO)
@@ -15,7 +15,7 @@ def test_multiiter_pos_calculation():
     scan_idx = 235
 
     configs = InferenceConfigDict(
-        reconstruction_image_path=os.path.join('data', 'pospred', 'pred_test{}'.format(scan_idx), 'pred_phase.tiff'),
+        reconstruction_image_path=os.path.join('data', 'position', 'pred_test{}'.format(scan_idx), 'pred_phase.tiff'),
         random_seed=196,
         debug=False,
         probe_position_list=None,
@@ -33,7 +33,7 @@ def test_multiiter_pos_calculation():
     # configs.__dict__['method_multiiter'] = ["serial", "collective", "collective"]
     # configs.__dict__['hybrid_registration_tols_multiiter'] = [[0.3, 0.15], [0.15, 0.1], [0.15, 0.1]]
     # Alternatively, you may also put these multiiter keys in a json or toml and read them.
-    configs.load_from_toml(os.path.join('data', 'pospred', 'config_{}.toml'.format(scan_idx)))
+    configs.load_from_toml(os.path.join('data', 'position', 'config_{}.toml'.format(scan_idx)))
     print(configs)
 
     corrector_chain = ProbePositionCorrectorChain(configs)
@@ -43,7 +43,7 @@ def test_multiiter_pos_calculation():
 
     calc_pos_list = corrector_chain.corrector_list[-1].new_probe_positions.array
 
-    gold_pos_list = np.genfromtxt(os.path.join('data_gold', 'pospred', 
+    gold_pos_list = np.genfromtxt(os.path.join('data_gold', 'position',
                                                'calc_pos_235.csv'),
                                   delimiter=',')
     gold_pos_list = gold_pos_list / 8e-9

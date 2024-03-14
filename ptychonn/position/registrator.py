@@ -11,7 +11,7 @@ import scipy.ndimage as ndi
 import scipy.signal
 import skimage
 
-from ptychonn.pospred.configs import RegistrationConfigDict
+from ptychonn.position.configs import RegistrationConfigDict
 
 class Registrator:
 
@@ -524,7 +524,7 @@ class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
                              np.ones(matched_points_prev.shape[0])], axis=1)
         a_mat = np.linalg.pinv(mat_curr) @ mat_prev
         return a_mat.T
-    
+
     def find_non_remote_pairs(self, matched_points_prev, matched_points_curr, image_shape, boundary_len=10):
         status = False
         mask_in_prev_y = np.logical_and(matched_points_prev[:, 0] > boundary_len,
@@ -548,7 +548,7 @@ class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
             if len(matched_points_prev) > len(inds):
                 status = True
         return inds, status
-        
+
     def find_majority_pairs(self, matched_points_prev, matched_points_curr,
                             prev_image=None, current_image=None, *args, **kwargs):
         if self.configs.sift_outlier_removal_method == 'kmeans':

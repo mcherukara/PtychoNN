@@ -4,8 +4,8 @@ import warnings
 import torch
 import numpy as np
 
-from ptychonn.pospred.configs import InferenceConfigDict
-from ptychonn.pospred.io import *
+from ptychonn.position.configs import InferenceConfigDict
+from ptychonn.position.io import *
 
 
 class Reconstructor:
