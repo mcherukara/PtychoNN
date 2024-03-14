@@ -1,13 +1,16 @@
 import logging
+import warnings
+
 try:
     import pycuda.driver as cuda
     import tensorrt as trt
 except ImportError:
-    print('Unable to import pycuda and tensorrt. If you do not intend to use the ONNX reconstructor, ignore '
-          'this message. ')
+    warnings.warn(
+        "Unable to import pycuda and tensorrt. If you do not intend to use the ONNX reconstructor, ignore "
+        "this message. "
+    )
 from skimage.transform import resize
 import numpy as np
-
 
 
 def engine_build_from_onnx(onnx_mdl):
@@ -17,7 +20,9 @@ def engine_build_from_onnx(onnx_mdl):
     config = builder.create_builder_config()
     # config.set_flag(trt.BuilderFlag.FP16)
     config.set_flag(trt.BuilderFlag.TF32)
-    config.max_workspace_size = 1 * (1 << 30)  # the maximum size that any layer in the network can use
+    config.max_workspace_size = 1 * (
+        1 << 30
+    )  # the maximum size that any layer in the network can use
 
     network = builder.create_network(EXPLICIT_BATCH)
     parser = trt.OnnxParser(network, TRT_LOGGER)
@@ -31,18 +36,19 @@ def engine_build_from_onnx(onnx_mdl):
 
     return builder.build_engine(network, config)
 
+
 def mem_allocation(engine):
     """
     Determine dimensions and create page-locked memory buffers (i.e. won't be swapped to disk) to hold host
     inputs/outputs.
     """
-    logging.debug('Expected input node shape is {}'.format(engine.get_binding_shape(0)))
+    logging.debug("Expected input node shape is {}".format(engine.get_binding_shape(0)))
     in_sz = trt.volume(engine.get_binding_shape(0)) * engine.max_batch_size
-    logging.debug('Input size: {}'.format(in_sz))
-    h_input = cuda.pagelocked_empty(in_sz, dtype='float32')
-    
+    logging.debug("Input size: {}".format(in_sz))
+    h_input = cuda.pagelocked_empty(in_sz, dtype="float32")
+
     out_sz = trt.volume(engine.get_binding_shape(1)) * engine.max_batch_size
-    h_output = cuda.pagelocked_empty(out_sz, dtype='float32')
+    h_output = cuda.pagelocked_empty(out_sz, dtype="float32")
 
     # Allocate device memory for inputs and outputs.
     d_input = cuda.mem_alloc(h_input.nbytes)
@@ -53,12 +59,15 @@ def mem_allocation(engine):
 
     return h_input, h_output, d_input, d_output, stream
 
+
 def inference(context, h_input, h_output, d_input, d_output, stream):
     # Transfer input data to the GPU.
     cuda.memcpy_htod_async(d_input, h_input, stream)
-    
+
     # Run inference.
-    context.execute_async_v2(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
+    context.execute_async_v2(
+        bindings=[int(d_input), int(d_output)], stream_handle=stream.handle
+    )
 
     # Transfer predictions back from the GPU.
     cuda.memcpy_dtoh_async(h_output, d_output, stream)
@@ -69,7 +78,9 @@ def inference(context, h_input, h_output, d_input, d_output, stream):
     return h_output
 
 
-def transform_data_for_ptychonn(dp, target_shape, discard_len=None, overflow_correction=False):
+def transform_data_for_ptychonn(
+    dp, target_shape, discard_len=None, overflow_correction=False
+):
     """
     Throw away 1/8 of the boundary region, and resize DPs to match label size.
 
@@ -96,7 +107,7 @@ def transform_data_for_ptychonn(dp, target_shape, discard_len=None, overflow_cor
             pad_len = [(0, 0)] * (len(dp.shape) - 2)
             pad_len_appendix = [(0, 0), (0, 0)]
             pad_len_appendix[i] = (-discard_len[i], -discard_len[i])
-            dp = np.pad(dp, np.array(pad_len + pad_len_appendix), mode='constant')
+            dp = np.pad(dp, np.array(pad_len + pad_len_appendix), mode="constant")
     target_shape = list(dp.shape[:-2]) + list(target_shape)
     if not (target_shape[-1] == dp.shape[-1] and target_shape[-2] == dp.shape[-2]):
         dp = resize(dp, target_shape, preserve_range=True, anti_aliasing=True)
@@ -112,6 +123,7 @@ def crop_center(img, shape_to_keep=(64, 64)):
     img = img[tuple(slicer)]
     return img
 
+
 def correct_overflow(arr):
     mask = arr < 0
     vals = arr[mask]
@@ -119,4 +131,3 @@ def correct_overflow(arr):
     arr[mask] = vals
     # logging.debug('{} overflowing values corrected.'.format(np.count_nonzero(mask)))
     return arr
-

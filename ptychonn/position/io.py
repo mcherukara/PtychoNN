@@ -8,7 +8,6 @@ import h5py
 
 
 class DataFileHandle:
-
     def __init__(self, file_path):
         self.file_path = file_path
         self.f = None
@@ -68,9 +67,9 @@ class DataFileHandle:
 
     def slice_array(self, slicers):
         """
-        Subslice the data array.
-self
-        :param slicers: list[slice].
+                Subslice the data array.
+        self
+                :param slicers: list[slice].
         """
         self.array = self.array[slicers]
         if self.array.ndim == 4:
@@ -85,8 +84,9 @@ self
         i_start = 0
         i_end = min(i_start + batch_size, self.num_dps)
         while i_start < self.num_dps:
-            data_transformed = transform_data_for_ptychonn(self.array[i_start:i_end], target_shape,
-                                                           discard_len=discard_len)
+            data_transformed = transform_data_for_ptychonn(
+                self.array[i_start:i_end], target_shape, discard_len=discard_len
+            )
             # Zero small elements
             data_transformed = np.where(data_transformed < 3, 0, data_transformed)
             new_arr[i_start:i_end] = data_transformed
@@ -96,14 +96,13 @@ self
 
     @staticmethod
     def take_from_3d_array(arr, ind):
-        if hasattr(ind, '__len__'):
+        if hasattr(ind, "__len__"):
             return np.take(arr[...], ind, axis=0)
         else:
             return arr[ind, :, :]
 
 
 class VirtualDataFileHandle(DataFileHandle):
-
     def __init__(self, file_path, dp_shape, num_dps):
         super().__init__(file_path)
         self.dp_shape = dp_shape
@@ -118,11 +117,10 @@ class VirtualDataFileHandle(DataFileHandle):
 
 
 class NPZFileHandle(DataFileHandle):
-
     def __init__(self, file_path):
         super().__init__(file_path)
         self.f = np.load(self.file_path)
-        self.array = self.f['reciprocal']
+        self.array = self.f["reciprocal"]
         self.num_dps = self.array.shape[0]
         self.shape = self.array.shape
 
@@ -131,11 +129,10 @@ class NPZFileHandle(DataFileHandle):
 
 
 class HDF5FileHandle(DataFileHandle):
-
     def __init__(self, file_path):
         super().__init__(file_path)
-        self.f = h5py.File(self.file_path, 'r')
-        self.array = self.f['data/reciprocal'][...]
+        self.f = h5py.File(self.file_path, "r")
+        self.array = self.f["data/reciprocal"][...]
         self.num_dps = self.array.shape[0]
         self.shape = self.array.shape
 
@@ -151,7 +148,7 @@ def create_data_file_handle(file_path) -> DataFileHandle:
     :return: DataFileHandle.
     """
     fmt = os.path.splitext(file_path)[-1]
-    if fmt == '.npz':
+    if fmt == ".npz":
         return NPZFileHandle(file_path)
 
 
@@ -165,7 +162,7 @@ def load_probe_positions_from_file(file_path, first_is_x=True):
     :return: np.ndarray. The returned shape is [n, 2], with each subarray storing a position in (y, x).
     """
     fmt = os.path.splitext(file_path)[-1]
-    if fmt == '.csv':
+    if fmt == ".csv":
         probe_pos = pd.read_csv(file_path, header=None).to_numpy()
     else:
         raise ValueError('Unsupported format "{}".'.format(fmt))
@@ -175,20 +172,19 @@ def load_probe_positions_from_file(file_path, first_is_x=True):
 
 
 def read_all_images(source_dir, name_prefix):
-    flist = glob.glob(os.path.join(source_dir, '{}*'.format(name_prefix)))
+    flist = glob.glob(os.path.join(source_dir, "{}*".format(name_prefix)))
     n = len(flist)
     images = []
     prefix = find_true_prefix([os.path.basename(x) for x in flist[:2]])
     for i in range(n):
-        img = tifffile.imread(
-            os.path.join(source_dir, '{}{}.tiff'.format(prefix, i)))
+        img = tifffile.imread(os.path.join(source_dir, "{}{}.tiff".format(prefix, i)))
         images.append(img)
     images = np.stack(images)
     return images
 
 
 def find_true_prefix(name_list):
-    s = ''
+    s = ""
     for i in range(len(name_list[0])):
         flag = True
         for fname in name_list:
@@ -205,4 +201,3 @@ def find_true_prefix(name_list):
 def save_positions_to_csv(pos, filename):
     df = pd.DataFrame(pos)
     df.to_csv(filename, header=False, index=False)
-

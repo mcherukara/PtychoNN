@@ -1,21 +1,20 @@
-import collections
 import json
 import dataclasses
 import warnings
 from typing import Any
+
 try:
     import tomli
-except:
-    warnings.warn('Unable to import tomli, which is needed to load a TOML config file.')
+except ImportError:
+    warnings.warn("Unable to import tomli, which is needed to load a TOML config file.")
 
 
 @dataclasses.dataclass
 class ConfigDict:
-
     def __str__(self, *args, **kwargs):
-        s = ''
+        s = ""
         for key in self.__dict__.keys():
-            s += '{}: {}\n'.format(key, self.__dict__[key])
+            s += "{}: {}\n".format(key, self.__dict__[key])
         return s
 
     def __repr__(self):
@@ -35,7 +34,7 @@ class ConfigDict:
             v = self.__dict__[key]
             if not self.__class__.is_jsonable(v):
                 if isinstance(v, (tuple, list)):
-                    v = '_'.join([str(x) for x in v])
+                    v = "_".join([str(x) for x in v])
                 else:
                     v = str(v)
             d[key] = v
@@ -60,8 +59,8 @@ class ConfigDict:
         Recursively search a ConfigDict and any of its keys that are also objects of ConfigDict for `key`.
         Replace its value with `value` if found.
         """
-        is_multiiter_key = key.endswith('_multiiter')
-        key_basename = key if not is_multiiter_key else key[:-len('_multiiter')]
+        is_multiiter_key = key.endswith("_multiiter")
+        key_basename = key if not is_multiiter_key else key[: -len("_multiiter")]
         for k in config_obj.__dict__.keys():
             if k == key_basename:
                 config_obj.__dict__[key] = value
@@ -73,18 +72,18 @@ class ConfigDict:
 
     def dump_to_json(self, filename):
         try:
-            f = open(filename, 'w')
+            f = open(filename, "w")
             d = self.get_serializable_dict()
             json.dump(d, f)
             f.close()
         except:
-            print('Failed to dump json.')
+            print("Failed to dump json.")
 
     def load_from_json(self, filename):
         """
         This function only overwrites entries contained in the JSON file. Unspecified entries are unaffected.
         """
-        f = open(filename, 'r')
+        f = open(filename, "r")
         d = json.load(f)
         for key in d.keys():
             self.overwrite_value_to_key(self, key, d[key])
@@ -94,7 +93,7 @@ class ConfigDict:
         """
         This function only overwrites entries contained in the TOML file. Unspecified entries are unaffected.
         """
-        f = open(filename, 'rb')
+        f = open(filename, "rb")
         d = tomli.load(f)
         for key in d.keys():
             self.overwrite_value_to_key(self, key, d[key])
@@ -103,8 +102,7 @@ class ConfigDict:
 
 @dataclasses.dataclass
 class RegistrationConfigDict(ConfigDict):
-
-    registration_method: str = 'error_map'
+    registration_method: str = "error_map"
     """Registration method. Can be "error_map", "sift", "hybrid"."""
 
     max_shift: int = 7
@@ -128,7 +126,7 @@ class RegistrationConfigDict(ConfigDict):
     if the quadratic function looks too smooth.
     """
 
-    sift_outlier_removal_method: str = 'kmeans'
+    sift_outlier_removal_method: str = "kmeans"
     """Method for detecting outlier matches for SIFT. Can be "trial_error", "kmeans", "isoforest", "ransac"."""
 
     sift_border_exclusion_length: int = 16
@@ -141,7 +139,11 @@ class RegistrationConfigDict(ConfigDict):
     registration_downsample: int = 1
     """Image downsampling before registration."""
 
-    hybrid_registration_algs: Any = ('error_map_multilevel', 'error_map_expandable', 'sift')
+    hybrid_registration_algs: Any = (
+        "error_map_multilevel",
+        "error_map_expandable",
+        "sift",
+    )
     """Hybrid registration algorithms"""
 
     hybrid_registration_tols: Any = (0.15, 0.3, 0.3)
@@ -194,7 +196,6 @@ class RegistrationConfigDict(ConfigDict):
 
 @dataclasses.dataclass
 class InferenceConfigDict(ConfigDict):
-
     # ===== PtychoNN configs =====
     batch_size: int = 1
     """Inference batch size."""
@@ -220,7 +221,7 @@ class InferenceConfigDict(ConfigDict):
 
     dp_data_path: str = None
     """
-    The path to the diffraction data file. When using a VirtualReconstrutor that uses already-reconstructed images, 
+    The path to the diffraction data file. When using a VirtualReconstrutor that uses already-reconstructed images,
     keep this as None.
     """
 
@@ -233,14 +234,16 @@ class InferenceConfigDict(ConfigDict):
     """ONNX file when using ONNXReconstructor."""
 
     # ===== General configs =====
-    registration_params: RegistrationConfigDict = dataclasses.field(default_factory=RegistrationConfigDict)
+    registration_params: RegistrationConfigDict = dataclasses.field(
+        default_factory=RegistrationConfigDict
+    )
     """Registration parameters."""
 
     reconstruction_image_path: Any = None
     """
     Path to the reconstructed images to be used for position prediction. If None, PtychoNNProbePositionCorrector
-    would then require a Reconstructor object that generate reconstructed images from diffraction patterns. 
-    Alternatively, one could also keep this argument as None and pass a VirtualReconstructor set to read 
+    would then require a Reconstructor object that generate reconstructed images from diffraction patterns.
+    Alternatively, one could also keep this argument as None and pass a VirtualReconstructor set to read
     the reconstructed images to ptycho_reconstructor.
     """
 
@@ -267,11 +270,11 @@ class InferenceConfigDict(ConfigDict):
 
     central_crop: Any = None
     """
-    List or tuple of int. Patch size used for image registration. If smaller than the reconstructed object size, 
+    List or tuple of int. Patch size used for image registration. If smaller than the reconstructed object size,
     a patch will be cropped from the center.
     """
 
-    method: str = 'collective'
+    method: str = "collective"
     """Method for correction. Can be 'serial' or 'collective'"""
 
     num_neighbors_collective: int = 3
@@ -291,6 +294,7 @@ class InferenceConfigDict(ConfigDict):
 
     debug: bool = False
 
+
 class TrainingConfigDict(ConfigDict):
     batch_size_per_process: int = 64
 
@@ -298,10 +302,10 @@ class TrainingConfigDict(ConfigDict):
 
     learning_rate_per_process: float = 1e-3
 
-    optimizer: str = 'adam'
+    optimizer: str = "adam"
     """String of optimizer name or the handle of a subclass of torch.optim.Optimizer"""
 
-    model_save_dir: str = '.'
+    model_save_dir: str = "."
     """Directory to save trained models"""
 
     model: Any = None
@@ -318,6 +322,7 @@ class TrainingConfigDict(ConfigDict):
     l1_weight: float = 0
 
     tv_weight: float = 0
+
 
 class PtychoNNTrainingConfigDict(TrainingConfigDict):
     height: int = 256
@@ -347,4 +352,3 @@ class PtychoNNTrainingConfigDict(TrainingConfigDict):
     schedule_learning_rate: bool = True
 
     pretrained_model_path: str = None
-

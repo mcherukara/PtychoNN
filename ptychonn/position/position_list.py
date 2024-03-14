@@ -6,9 +6,17 @@ import matplotlib
 
 from ptychonn.position.io import load_probe_positions_from_file, save_positions_to_csv
 
+
 class ProbePositionList:
-    def __init__(self, file_path=None, position_list=None, unit='pixel', psize_nm=None, convert_to_pixel=True,
-                 first_is_x=False):
+    def __init__(
+        self,
+        file_path=None,
+        position_list=None,
+        unit="pixel",
+        psize_nm=None,
+        convert_to_pixel=True,
+        first_is_x=False,
+    ):
         """
         Probe position list.
 
@@ -31,9 +39,11 @@ class ProbePositionList:
         """
         Convert the unit of position values to pixel.
         """
-        if self.original_unit == 'pixel':
+        if self.original_unit == "pixel":
             return
-        factor = {'m': 1e9, 'cm': 1e7, 'mm': 1e6, 'um': 1e3, 'nm': 1}[self.original_unit]
+        factor = {"m": 1e9, "cm": 1e7, "mm": 1e6, "um": 1e3, "nm": 1}[
+            self.original_unit
+        ]
         self.array = self.array * factor / self.psize_nm
 
     def __len__(self):
@@ -48,22 +58,31 @@ class ProbePositionList:
         return a
 
     def plot(self, show=True, return_obj=False):
-        cmap = matplotlib.cm.get_cmap('Spectral')
-        color_list = [matplotlib.colors.rgb2hex(cmap(x)) for x in np.linspace(0, 1, self.array.shape[0])]
+        cmap = matplotlib.cm.get_cmap("Spectral")
+        color_list = [
+            matplotlib.colors.rgb2hex(cmap(x))
+            for x in np.linspace(0, 1, self.array.shape[0])
+        ]
         fig, ax = plt.subplots(1, 1)
-        scat = plt.scatter(self.array[:, 1], self.array[:, 0], c=color_list, s=1, )
-        lines = plt.plot(self.array[:, 1], self.array[:, 0], linewidth=0.5, alpha=0.3, c='gray')
+        scat = plt.scatter(
+            self.array[:, 1],
+            self.array[:, 0],
+            c=color_list,
+            s=1,
+        )
+        lines = plt.plot(
+            self.array[:, 1], self.array[:, 0], linewidth=0.5, alpha=0.3, c="gray"
+        )
         plt.gca().invert_yaxis()
         if show:
             plt.show()
         if return_obj:
             return fig, ax, scat
 
-    def to_csv(self, filename, unit='m', psize_nm=1):
+    def to_csv(self, filename, unit="m", psize_nm=1):
         arr = self.array
-        if unit != 'pixel':
+        if unit != "pixel":
             arr = arr * psize_nm
-            factor = {'m': 1e9, 'cm': 1e7, 'mm': 1e6, 'um': 1e3, 'nm': 1}[unit]
+            factor = {"m": 1e9, "cm": 1e7, "mm": 1e6, "um": 1e3, "nm": 1}[unit]
             arr = arr / factor
         save_positions_to_csv(arr, filename)
-

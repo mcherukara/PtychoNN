@@ -11,8 +11,9 @@ def timeit(func):
         t0 = time.time()
         ret = func(*args, **kwargs)
         t1 = time.time()
-        print('Delta-t for {}: {} s'.format(func.__name__, t1 - t0))
+        print("Delta-t for {}: {} s".format(func.__name__, t1 - t0))
         return ret
+
     return wrapper
 
 
@@ -22,8 +23,9 @@ def class_timeit(func):
         t0 = time.time()
         ret = func(self, *args, **kwargs)
         t1 = time.time()
-        print('Delta-t for {}: {} s'.format(func.__name__, t1 - t0))
+        print("Delta-t for {}: {} s".format(func.__name__, t1 - t0))
         return ret
+
     return wrapper
 
 
@@ -38,9 +40,8 @@ def get_gpu_memory(show=False):
     r = torch.cuda.memory_reserved(0)
     a = torch.cuda.memory_allocated(0)
     if show:
-        print('Device 0 memory info:')
-        print('    {} MB total'.format(t / 1024 ** 2))
-        print('    {} MB reserved'.format(r / 1024 ** 2))
-        print('    {} MB allocated'.format(a / 1024 ** 2))
+        print("Device 0 memory info:")
+        print("    {} MB total".format(t / 1024**2))
+        print("    {} MB reserved".format(r / 1024**2))
+        print("    {} MB allocated".format(a / 1024**2))
     return t, r, a
-

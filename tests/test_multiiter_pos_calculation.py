@@ -8,14 +8,16 @@ from ptychonn.position.core import ProbePositionCorrectorChain
 from ptychonn.position.position_list import ProbePositionList
 
 
-logging.basicConfig(format='[%(asctime)s] %(message)s', level=logging.INFO)
+logging.basicConfig(format="[%(asctime)s] %(message)s", level=logging.INFO)
 
 
 def test_multiiter_pos_calculation():
     scan_idx = 235
 
     configs = InferenceConfigDict(
-        reconstruction_image_path=os.path.join('data', 'position', 'pred_test{}'.format(scan_idx), 'pred_phase.tiff'),
+        reconstruction_image_path=os.path.join(
+            "data", "position", "pred_test{}".format(scan_idx), "pred_phase.tiff"
+        ),
         random_seed=196,
         debug=False,
         probe_position_list=None,
@@ -24,16 +26,16 @@ def test_multiiter_pos_calculation():
         # where arr is a [N, 2] array of probe positions in pixel.
         central_crop=None,
         num_neighbors_collective=4,
-        registration_params=RegistrationConfigDict(
-            registration_method='hybrid'
-        )
+        registration_params=RegistrationConfigDict(registration_method="hybrid"),
     )
     # One can use different values for a config key at different iterations. To do this, create dict keys in the
     # config object with a name of "<existing_config_ket_name>_multiiter". For example:
     # configs.__dict__['method_multiiter'] = ["serial", "collective", "collective"]
     # configs.__dict__['hybrid_registration_tols_multiiter'] = [[0.3, 0.15], [0.15, 0.1], [0.15, 0.1]]
     # Alternatively, you may also put these multiiter keys in a json or toml and read them.
-    configs.load_from_toml(os.path.join('data', 'position', 'config_{}.toml'.format(scan_idx)))
+    configs.load_from_toml(
+        os.path.join("data", "position", "config_{}.toml".format(scan_idx))
+    )
     print(configs)
 
     corrector_chain = ProbePositionCorrectorChain(configs)
@@ -43,9 +45,9 @@ def test_multiiter_pos_calculation():
 
     calc_pos_list = corrector_chain.corrector_list[-1].new_probe_positions.array
 
-    gold_pos_list = np.genfromtxt(os.path.join('data_gold', 'position',
-                                               'calc_pos_235.csv'),
-                                  delimiter=',')
+    gold_pos_list = np.genfromtxt(
+        os.path.join("data_gold", "position", "calc_pos_235.csv"), delimiter=","
+    )
     gold_pos_list = gold_pos_list / 8e-9
     calc_pos_list -= np.mean(calc_pos_list, axis=0)
     gold_pos_list -= np.mean(gold_pos_list, axis=0)
@@ -53,6 +55,5 @@ def test_multiiter_pos_calculation():
     assert np.allclose(calc_pos_list, gold_pos_list, atol=1e-1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_multiiter_pos_calculation()
-
