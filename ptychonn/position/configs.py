@@ -93,6 +93,18 @@ class ConfigDict:
             self.overwrite_value_to_key(self, key, d[key])
         f.close()
 
+    @staticmethod
+    def from_toml(filename):
+        obj = InferenceConfigDict()
+        obj.load_from_toml(filename)
+        return obj
+
+    @staticmethod
+    def from_json(filename):
+        obj = InferenceConfigDict()
+        obj.load_from_json(filename)
+        return obj
+
 
 @dataclasses.dataclass
 class RegistrationConfigDict(ConfigDict):
