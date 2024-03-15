@@ -504,7 +504,7 @@ class PtychoNNProbePositionCorrector:
 
 
 class ProbePositionCorrectorChain:
-    def __init__(self, config_dict):
+    def __init__(self, config_dict: InferenceConfigDict):
         self.config_dict = config_dict
         self.corrector_list = []
         self.multiiter_keys = []
