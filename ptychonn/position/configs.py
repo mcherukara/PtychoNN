@@ -17,9 +17,6 @@ class ConfigDict:
             s += "{}: {}\n".format(key, self.__dict__[key])
         return s
 
-    def __repr__(self):
-        return self.__str__()
-
     @staticmethod
     def is_jsonable(x):
         try:
