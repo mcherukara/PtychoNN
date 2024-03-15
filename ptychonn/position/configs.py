@@ -68,13 +68,10 @@ class ConfigDict:
         return
 
     def dump_to_json(self, filename):
-        try:
-            f = open(filename, "w")
-            d = self.get_serializable_dict()
-            json.dump(d, f)
-            f.close()
-        except:
-            print("Failed to dump json.")
+        f = open(filename, "w")
+        d = self.get_serializable_dict()
+        json.dump(d, f)
+        f.close()
 
     def load_from_json(self, filename):
         """
