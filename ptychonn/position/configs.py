@@ -190,43 +190,6 @@ class RegistrationConfigDict(ConfigDict):
 
 @dataclasses.dataclass
 class InferenceConfigDict(ConfigDict):
-    # ===== PtychoNN configs =====
-    batch_size: int = 1
-    """Inference batch size."""
-
-    model_path: str = None
-    """Path to a trained PtychoNN model."""
-
-    model: Any = None
-    """
-
-    The model. Should be a tuple(nn.Module, kwargs): the first element of the tuple is the class handle of a
-    model class, and the second is a dictionary of keyword arguments. The model will be instantiated using these.
-    This value is used to instantiate a model object, whose weights are overwritten with those read from
-
-
-    `model_path`. The provided model class and arguments must match the model being loaded.
-    """
-
-    ptycho_reconstructor: Any = None
-    """
-    Should be either None or a Reconstructor object. If None, PyTorchReconstructor is used by default.
-    """
-
-    dp_data_path: str = None
-    """
-    The path to the diffraction data file. When using a VirtualReconstrutor that uses already-reconstructed images,
-    keep this as None.
-    """
-
-    prediction_output_path: str = None
-    """Path to save PtychoNN prediction results."""
-
-    cpu_only: bool = False
-
-    onnx_mdl: Any = None
-    """ONNX file when using ONNXReconstructor."""
-
     # ===== General configs =====
     registration_params: RegistrationConfigDict = dataclasses.field(
         default_factory=RegistrationConfigDict
@@ -275,74 +238,27 @@ class InferenceConfigDict(ConfigDict):
     """Number of neighbors in collective registration"""
 
     offset_estimator_order: int = 1
+    """
+    Order of momentum used in the offset estimator. The estimator is used only in serial mode and when the 
+    registration result is not reliable.
+    """
 
     offset_estimator_beta: float = 0.5
+    """Weight of past offsets when updating the running average of offsets in the offset estimator."""
 
     smooth_constraint_weight: float = 1e-2
+    """
+    Weight of the smoothness constraint when solving for global-frame probe positions. This is the lambda_2
+    in the equation in the paper.
+    """
 
     rectangular_grid: bool = False
-
-    stitching_downsampling: int = 1
+    """
+    Whether the scan grid is a rectangular grid. Some parameters including 
+    `use_baseline_offsets_for_points_on_same_row` won't take effect unless this is set to True.
+    """
 
     random_seed: Any = 123
+    """Random seed."""
 
     debug: bool = False
-
-
-class TrainingConfigDict(ConfigDict):
-    batch_size_per_process: int = 64
-
-    num_epochs: int = 60
-
-    learning_rate_per_process: float = 1e-3
-
-    optimizer: str = "adam"
-    """String of optimizer name or the handle of a subclass of torch.optim.Optimizer"""
-
-    model_save_dir: str = "."
-    """Directory to save trained models"""
-
-    model: Any = None
-    """
-    The model. The three options are:
-    (1) None: the model will be instantiated with the default model class.
-    (2) A object of nn.Module: the model object will be used as provided.
-
-
-    (3) tuple(nn.Module, kwargs): the first element of the tuple is the class handle of a model class, and the
-        second is a dictionary of keyword arguments. The model will be instantiated using these.
-    """
-
-    l1_weight: float = 0
-
-    tv_weight: float = 0
-
-
-class PtychoNNTrainingConfigDict(TrainingConfigDict):
-    height: int = 256
-
-    width: int = 256
-
-    num_lines_for_training: int = 100
-    """Number of lines used for training"""
-
-    num_lines_for_testing: int = 60
-    """Number of lines used for testing"""
-
-    num_lines_for_validation: int = 805
-    """Number of lines used for testing"""
-
-    dataset: Any = None
-    """A torch.Dataset object"""
-
-    validation_ratio: float = 0.003
-    """Ratio of validation set out of the entire dataset"""
-
-    loss_function: Any = None
-    """Can be None (default to L1Loss) or a Callable."""
-
-    dataset_decimation_ratio: float = 1.0
-
-    schedule_learning_rate: bool = True
-
-    pretrained_model_path: str = None

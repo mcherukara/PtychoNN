@@ -16,10 +16,10 @@ class Reconstructor:
         self.device = None
 
     def build(self):
-        if self.config_dict.cpu_only or (not torch.cuda.is_available()):
-            self.device = torch.device("cpu")
-        else:
+        if torch.cuda.is_available():
             self.device = torch.device("cuda")
+        else:
+            self.device = torch.device("cpu")
 
     def batch_infer(self, x):
         pass
