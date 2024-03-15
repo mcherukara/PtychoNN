@@ -1,6 +1,4 @@
-import copy
 import logging
-import warnings
 
 import numpy as np
 import skimage.feature
@@ -8,7 +6,6 @@ import sklearn.cluster
 import sklearn.ensemble
 import matplotlib.pyplot as plt
 import scipy.ndimage as ndi
-import scipy.signal
 import skimage
 
 from ptychonn.position.configs import RegistrationConfigDict
