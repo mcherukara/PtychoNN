@@ -5,30 +5,17 @@ from ptychonn.position.configs import InferenceConfig
 from ptychonn.position.io import *
 
 
-class Reconstructor:
-    def __init__(self, config_dict: InferenceConfig):
-        """
-        Inference engine for PtychoNN.
-
-        :param config_dict: dict. Configuration dictionary.
-        """
-        self.config_dict = config_dict
+class VirtualReconstructor:
+    def __init__(self, configs: InferenceConfig):
+        self.configs = configs
         self.device = None
+        self.object_image_array = None
 
     def build(self):
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
         else:
             self.device = torch.device("cpu")
-
-    def batch_infer(self, x):
-        pass
-
-
-class VirtualReconstructor(Reconstructor):
-    def __init__(self, config_dict: InferenceConfig):
-        super().__init__(config_dict)
-        self.object_image_array = None
 
     def set_object_image_array(self, arr):
         self.object_image_array = arr
