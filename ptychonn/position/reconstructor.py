@@ -1,12 +1,12 @@
 import torch
 import numpy as np
 
-from ptychonn.position.configs import InferenceConfigDict
+from ptychonn.position.configs import InferenceConfig
 from ptychonn.position.io import *
 
 
 class Reconstructor:
-    def __init__(self, config_dict: InferenceConfigDict):
+    def __init__(self, config_dict: InferenceConfig):
         """
         Inference engine for PtychoNN.
 
@@ -26,7 +26,7 @@ class Reconstructor:
 
 
 class VirtualReconstructor(Reconstructor):
-    def __init__(self, config_dict: InferenceConfigDict):
+    def __init__(self, config_dict: InferenceConfig):
         super().__init__(config_dict)
         self.object_image_array = None
 

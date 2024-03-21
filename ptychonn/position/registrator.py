@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 import scipy.ndimage as ndi
 import skimage
 
-from ptychonn.position.configs import RegistrationConfigDict
+from ptychonn.position.configs import RegistrationConfig
 
 
 class Registrator:
     def __init__(
-        self, configs: RegistrationConfigDict, random_seed: int = 123, **kwargs
+        self, configs: RegistrationConfig, random_seed: int = 123, **kwargs
     ):
         self.configs = configs
         self.random_seed = random_seed
@@ -86,7 +86,7 @@ class Registrator:
 
 
 class RegistrationAlgorithm:
-    def __init__(self, configs: RegistrationConfigDict, *args, **kwargs):
+    def __init__(self, configs: RegistrationConfig, *args, **kwargs):
         self.status_dict = {"ok": 0, "questionable": 1, "bad": 2, "empty": 3}
         self.status = 0
         self.random_seed = 123
@@ -140,7 +140,7 @@ class RegistrationAlgorithm:
 
 
 class HybridRegistrationAlgorithm(RegistrationAlgorithm):
-    def __init__(self, configs: RegistrationConfigDict, *args, **kwargs):
+    def __init__(self, configs: RegistrationConfig, *args, **kwargs):
         super().__init__(configs, *args, **kwargs)
         self.alg_list = []
         self.alg_names = configs.hybrid_registration_algs
@@ -166,7 +166,7 @@ class HybridRegistrationAlgorithm(RegistrationAlgorithm):
 
 
 class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
-    def __init__(self, configs: RegistrationConfigDict, *args, **kwargs):
+    def __init__(self, configs: RegistrationConfig, *args, **kwargs):
         super().__init__(configs, *args, **kwargs)
         starting_max_shift = 30
         self.configs = configs
@@ -533,7 +533,7 @@ class ErrorMapRegistrationAlgorithm(RegistrationAlgorithm):
 
 
 class SIFTRegistrationAlgorithm(RegistrationAlgorithm):
-    def __init__(self, configs: RegistrationConfigDict, **kwargs):
+    def __init__(self, configs: RegistrationConfig, **kwargs):
         """
         SIFT registration.
         """

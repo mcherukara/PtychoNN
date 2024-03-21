@@ -3,9 +3,6 @@ import logging
 import numpy as np
 
 import ptychonn.position
-from ptychonn.position.configs import InferenceConfigDict, RegistrationConfigDict
-from ptychonn.position.core import ProbePositionCorrectorChain
-from ptychonn.position.position_list import ProbePositionList
 
 
 logging.basicConfig(format="[%(asctime)s] %(message)s", level=logging.INFO)
@@ -14,7 +11,7 @@ logging.basicConfig(format="[%(asctime)s] %(message)s", level=logging.INFO)
 def test_multiiter_pos_calculation():
     scan_idx = 235
 
-    configs = InferenceConfigDict(
+    configs = ptychonn.position.InferenceConfig(
         reconstruction_image_path=os.path.join(
             "data", "position", "pred_test{}".format(scan_idx), "pred_phase.tiff"
         ),
@@ -26,7 +23,9 @@ def test_multiiter_pos_calculation():
         # where arr is a [N, 2] array of probe positions in pixel.
         central_crop=None,
         num_neighbors_collective=4,
-        registration_params=RegistrationConfigDict(registration_method="hybrid"),
+        registration_params=ptychonn.position.RegistrationConfig(
+            registration_method="hybrid"
+        ),
     )
     # One can use different values for a config key at different iterations. To do this, create dict keys in the
     # config object with a name of "<existing_config_ket_name>_multiiter". For example:
@@ -38,7 +37,7 @@ def test_multiiter_pos_calculation():
     )
     print(configs)
 
-    corrector_chain = ProbePositionCorrectorChain(configs)
+    corrector_chain = ptychonn.position.ProbePositionCorrectorChain(configs)
     corrector_chain.verbose = False
     corrector_chain.build()
     corrector_chain.run()

@@ -7,7 +7,7 @@ from tqdm import trange, tqdm
 import matplotlib.pyplot as plt
 import sklearn.neighbors
 
-from ptychonn.position.configs import ConfigDict, InferenceConfigDict
+from ptychonn.position.configs import Config, InferenceConfig
 from ptychonn.position.reconstructor import VirtualReconstructor
 from ptychonn.position.io import create_data_file_handle, VirtualDataFileHandle
 from ptychonn.position.position_list import ProbePositionList
@@ -98,7 +98,7 @@ class OffsetEstimator:
 
 
 class PtychoNNProbePositionCorrector:
-    def __init__(self, config_dict: InferenceConfigDict):
+    def __init__(self, config_dict: InferenceConfig):
         self.config_dict = config_dict
         if self.config_dict.reconstruction_image_path is None:
             if self.config_dict.ptycho_reconstructor is None:
@@ -106,7 +106,7 @@ class PtychoNNProbePositionCorrector:
             else:
                 self.ptycho_reconstructor = self.config_dict.ptycho_reconstructor
         else:
-            self.ptycho_reconstructor = VirtualReconstructor(InferenceConfigDict())
+            self.ptycho_reconstructor = VirtualReconstructor(InferenceConfig())
 
         self.dp_data_fhdl = None
         self.orig_probe_positions = None
@@ -504,7 +504,7 @@ class PtychoNNProbePositionCorrector:
 
 
 class ProbePositionCorrectorChain:
-    def __init__(self, config_dict: InferenceConfigDict):
+    def __init__(self, config_dict: InferenceConfig):
         self.config_dict = config_dict
         self.corrector_list = []
         self.multiiter_keys = []
@@ -525,7 +525,7 @@ class ProbePositionCorrectorChain:
                 self.multiiter_keys.append(key)
                 self.has_multiiter_key = True
         for key, value in config_obj.__dict__.items():
-            if isinstance(value, ConfigDict):
+            if isinstance(value, Config):
                 self.find_multiiter_keys(value)
 
     def build_multiiter_entries(self):

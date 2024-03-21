@@ -10,7 +10,7 @@ except ImportError:
 
 
 @dataclasses.dataclass
-class ConfigDict:
+class Config:
     def __str__(self, *args, **kwargs):
         s = ""
         for key in self.__dict__.keys():
@@ -43,7 +43,7 @@ class ConfigDict:
             if k == key:
                 return config_obj.__dict__[k]
         for k, item in config_obj.__dict__.items():
-            if isinstance(item, ConfigDict):
+            if isinstance(item, Config):
                 return config_obj.recursive_query(item, key)
         return
 
@@ -53,7 +53,7 @@ class ConfigDict:
     @staticmethod
     def overwrite_value_to_key(config_obj, key, value):
         """
-        Recursively search a ConfigDict and any of its keys that are also objects of ConfigDict for `key`.
+        Recursively search a Config and any of its keys that are also objects of Config for `key`.
         Replace its value with `value` if found.
         """
         is_multiiter_key = key.endswith("_multiiter")
@@ -63,7 +63,7 @@ class ConfigDict:
                 config_obj.__dict__[key] = value
                 return
         for k, item in config_obj.__dict__.items():
-            if isinstance(item, ConfigDict):
+            if isinstance(item, Config):
                 config_obj.overwrite_value_to_key(item, key, value)
         return
 
@@ -95,19 +95,19 @@ class ConfigDict:
 
     @staticmethod
     def from_toml(filename):
-        obj = InferenceConfigDict()
+        obj = InferenceConfig()
         obj.load_from_toml(filename)
         return obj
 
     @staticmethod
     def from_json(filename):
-        obj = InferenceConfigDict()
+        obj = InferenceConfig()
         obj.load_from_json(filename)
         return obj
 
 
 @dataclasses.dataclass
-class RegistrationConfigDict(ConfigDict):
+class RegistrationConfig(Config):
     registration_method: str = "error_map"
     """Registration method. Can be "error_map", "sift", "hybrid"."""
 
@@ -201,10 +201,10 @@ class RegistrationConfigDict(ConfigDict):
 
 
 @dataclasses.dataclass
-class InferenceConfigDict(ConfigDict):
+class InferenceConfig(Config):
     # ===== General configs =====
-    registration_params: RegistrationConfigDict = dataclasses.field(
-        default_factory=RegistrationConfigDict
+    registration_params: RegistrationConfig = dataclasses.field(
+        default_factory=RegistrationConfig
     )
     """Registration parameters."""
 
@@ -251,7 +251,7 @@ class InferenceConfigDict(ConfigDict):
 
     offset_estimator_order: int = 1
     """
-    Order of momentum used in the offset estimator. The estimator is used only in serial mode and when the 
+    Order of momentum used in the offset estimator. The estimator is used only in serial mode and when the
     registration result is not reliable.
     """
 
@@ -266,7 +266,7 @@ class InferenceConfigDict(ConfigDict):
 
     rectangular_grid: bool = False
     """
-    Whether the scan grid is a rectangular grid. Some parameters including 
+    Whether the scan grid is a rectangular grid. Some parameters including
     `use_baseline_offsets_for_points_on_same_row` won't take effect unless this is set to True.
     """
 
