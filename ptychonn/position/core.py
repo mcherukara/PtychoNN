@@ -100,14 +100,7 @@ class OffsetEstimator:
 class PtychoNNProbePositionCorrector:
     def __init__(self, config_dict: InferenceConfig):
         self.config_dict = config_dict
-        if self.config_dict.reconstruction_image_path is None:
-            if self.config_dict.ptycho_reconstructor is None:
-                self.ptycho_reconstructor = PyTorchReconstructor(self.config_dict)
-            else:
-                self.ptycho_reconstructor = self.config_dict.ptycho_reconstructor
-        else:
-            self.ptycho_reconstructor = VirtualReconstructor(InferenceConfig())
-
+        self.ptycho_reconstructor = VirtualReconstructor(InferenceConfig())
         self.dp_data_fhdl = None
         self.orig_probe_positions = None
         self.new_probe_positions = None
@@ -127,26 +120,16 @@ class PtychoNNProbePositionCorrector:
             )
             np.random.seed(self.config_dict.random_seed)
 
-        if self.config_dict.reconstruction_image_path is not None and isinstance(
-            self.ptycho_reconstructor, VirtualReconstructor
-        ):
-            recons = tifffile.imread(self.config_dict.reconstruction_image_path)
-            self.ptycho_reconstructor.set_object_image_array(recons)
+        assert isinstance(self.ptycho_reconstructor, VirtualReconstructor)
+        recons = tifffile.imread(self.config_dict.reconstruction_image_path)
+        self.ptycho_reconstructor.set_object_image_array(recons)
         self.ptycho_reconstructor.build()
 
-        if not self.config_dict.dp_data_file_handle:
-            if isinstance(self.ptycho_reconstructor, VirtualReconstructor):
-                self.dp_data_fhdl = VirtualDataFileHandle(
-                    "",
-                    dp_shape=self.ptycho_reconstructor.object_image_array.shape[1:],
-                    num_dps=self.ptycho_reconstructor.object_image_array.shape[0],
-                )
-            else:
-                self.dp_data_fhdl = create_data_file_handle(
-                    self.config_dict.dp_data_path
-                )
-        else:
-            self.dp_data_fhdl = self.config_dict.dp_data_file_handle
+        self.dp_data_fhdl = VirtualDataFileHandle(
+            "",
+            dp_shape=self.ptycho_reconstructor.object_image_array.shape[1:],
+            num_dps=self.ptycho_reconstructor.object_image_array.shape[0],
+        )
         self.n_dps = self.dp_data_fhdl.num_dps
 
         self.orig_probe_positions = ProbePositionList(

@@ -1,7 +1,11 @@
 import json
 import dataclasses
 import warnings
-from typing import Any
+from typing import Any, Optional, Union
+from collections.abc import Sequence
+
+from ptychonn.position.position_list import ProbePositionList
+from ptychonn.position.io import DataFileHandle
 
 try:
     import tomli
@@ -145,20 +149,20 @@ class RegistrationConfig(Config):
     registration_downsample: int = 1
     """Image downsampling before registration."""
 
-    hybrid_registration_algs: Any = (
+    hybrid_registration_algs: Sequence[str] = (
         "error_map_multilevel",
         "error_map_expandable",
         "sift",
     )
     """Hybrid registration algorithms"""
 
-    hybrid_registration_tols: Any = (0.15, 0.3, 0.3)
+    hybrid_registration_tols: Sequence[float] = (0.15, 0.3, 0.3)
     """Hybrid registration tolerances. This value is disregarded unless registration method is hybrid."""
 
     nonhybrid_registration_tol: float = None
     """Error tolerance for non-hybrid registration. This value is disregarded if registration method is hybrid."""
 
-    registration_tol_schedule: Any = None
+    registration_tol_schedule: Optional[Sequence[Sequence[int, float], ...]] = None
     """
     The schedule of error tolerance for registration algorithms. This should be a (N, 2) list. In each sub-list,
     the first value is the index of point, and the second value is the new tolerance value to be used at and
@@ -208,36 +212,33 @@ class InferenceConfig(Config):
     )
     """Registration parameters."""
 
-    reconstruction_image_path: Any = None
+    reconstruction_image_path: str = ''
     """
-    Path to the reconstructed images to be used for position prediction. If None, PtychoNNProbePositionCorrector
-    would then require a Reconstructor object that generate reconstructed images from diffraction patterns.
-    Alternatively, one could also keep this argument as None and pass a VirtualReconstructor set to read
-    the reconstructed images to ptycho_reconstructor.
+    Path to the reconstructed images to be used for position prediction.
     """
 
-    dp_data_file_path: str = None
-
-    dp_data_file_handle: Any = None
-    """Used as an alternative to `dp_data_file_path`. Should be a `DataFileHandle` object."""
-
-    probe_position_list: Any = None
+    probe_position_list: Optional[ProbePositionList] = None
     """
     A ProbePositionList object used for finding nearest neighbors in collective mode.
     If None, `probe_position_data_path` must be provided.
     """
 
-    probe_position_data_path: Any = None
+    probe_position_data_path: Optional[str] = None
+    """
+    Path to the data file containing probe positions, which should be a CSV file with each line containing the 
+    positions in y and x. Ignored if `probe_position_list` is provided. 
+    """
 
-    probe_position_data_unit: str = None
-    """Unit of provided probe position. Can be 'nm', 'm', or 'pixel'."""
+    probe_position_data_unit: Optional[str] = None
+    """Unit of provided probe position. Can be 'nm', 'm', or 'pixel'. Ignored if `probe_position_list` is provided."""
 
-    pixel_size_nm: float = None
+    pixel_size_nm: Optional[float] = None
+    """Pixel size of input positions. Ignored if `probe_position_list` is provided."""
 
-    baseline_position_list: Any = None
+    baseline_position_list: Optional[ProbePositionList] = None
     """Baseline positions. Used by ProbePositionCorrectorChain when the serial mode result is bad."""
 
-    central_crop: Any = None
+    central_crop: Optional[Sequence[int, int]] = None
     """
     List or tuple of int. Patch size used for image registration. If smaller than the reconstructed object size,
     a patch will be cropped from the center.
@@ -270,7 +271,7 @@ class InferenceConfig(Config):
     `use_baseline_offsets_for_points_on_same_row` won't take effect unless this is set to True.
     """
 
-    random_seed: Any = 123
+    random_seed: Optional[int] = 123
     """Random seed."""
 
     debug: bool = False
