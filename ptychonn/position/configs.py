@@ -1,7 +1,7 @@
 import json
 import dataclasses
 import warnings
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Literal
 from collections.abc import Sequence
 
 from ptychonn.position.position_list import ProbePositionList
@@ -112,7 +112,7 @@ class Config:
 
 @dataclasses.dataclass
 class RegistrationConfig(Config):
-    registration_method: str = "error_map"
+    registration_method: Literal["error_map", "sift", "hybrid"] = "error_map"
     """Registration method. Can be "error_map", "sift", "hybrid"."""
 
     max_shift: int = 7
@@ -136,7 +136,7 @@ class RegistrationConfig(Config):
     if the quadratic function looks too smooth.
     """
 
-    sift_outlier_removal_method: str = "kmeans"
+    sift_outlier_removal_method: Literal["trial_error", "kmeans", "isoforest", "ransac"] = "trial_error"
     """Method for detecting outlier matches for SIFT. Can be "trial_error", "kmeans", "isoforest", "ransac"."""
 
     sift_border_exclusion_length: int = 16
@@ -244,7 +244,7 @@ class InferenceConfig(Config):
     a patch will be cropped from the center.
     """
 
-    method: str = "collective"
+    method: Literal["serial", "collective"] = "collective"
     """Method for correction. Can be 'serial' or 'collective'"""
 
     num_neighbors_collective: int = 3
