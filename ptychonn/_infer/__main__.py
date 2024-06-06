@@ -211,7 +211,7 @@ def infer(
     inferences : (POSITION, 2, WIDTH, HEIGHT)
         The reconstructed patches inferred by the model.
     '''
-    model.eval()
+    model = model.eval().to("cuda")
     result = []
     with torch.no_grad():
         for batch in data:
