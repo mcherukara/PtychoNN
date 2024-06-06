@@ -152,6 +152,7 @@ def train(
     out_dir: pathlib.Path | None,
     epochs: int = 1,
     batch_size: int = 32,
+    training_fraction: float = 0.8,
 ) -> typing.Tuple[lightning.Trainer, lightning.pytorch.loggers.CSVLogger | ListLogger]:
     """Train a PtychoNN model.
 
@@ -178,6 +179,8 @@ def train(
         The maximum number of training epochs
     batch_size
         The size of one training batch.
+    training_fraction
+        The proprotion of X_train and Y_train that is used for training.
     """
     if out_dir is not None:
         checkpoint_callback = lightning.pytorch.callbacks.ModelCheckpoint(
@@ -210,6 +213,7 @@ def train(
         X_train,
         Y_train,
         batch_size,
+        training_fraction=training_fraction,
     )
 
     trainer.fit(
