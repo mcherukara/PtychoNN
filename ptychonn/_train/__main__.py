@@ -154,6 +154,10 @@ def train(
     batch_size: int = 32,
     training_fraction: float = 0.8,
     log_frequency: int = 50,
+    distributed_backend: typing.Literal[
+        "dp", "ddp", "ddp_spawn", "ddp2", "horovod", None
+    ] = None,
+    devices: int | typing.List[int] = -1,
 ) -> typing.Tuple[lightning.Trainer, lightning.pytorch.loggers.CSVLogger | ListLogger]:
     """Train a PtychoNN model.
 
@@ -219,6 +223,8 @@ def train(
         logger=logger,
         enable_checkpointing=False if out_dir is None else True,
         log_every_n_steps=log_frequency,
+        distributed_backend=distributed_backend,
+        devices=devices,
     )
 
     train_dataloader, val_dataloader = create_training_dataloader(
