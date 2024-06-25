@@ -5,7 +5,7 @@ import tike.ptycho
 import tike.ptycho.learn
 
 
-def test_construct_simulated_training_set(W=2048, N=2048, S=128):
+def test_construct_simulated_training_set(W=2048, N=2048 + 1024, S=128):
     phase = libimage.load('coins', W) - 0.5
     amplitude = 1 - libimage.load('earring', W)
     fov = (amplitude * np.exp(1j * phase * np.pi)).astype('complex64')
@@ -31,7 +31,7 @@ def test_construct_simulated_training_set(W=2048, N=2048, S=128):
             detector_shape=probe.shape[-1],
             probe=probe,
             scan=scan,
-            psi=fov,
+            psi=fov[None, ...],
         ),
         axes=(-2, -1),
     ).astype('float32')
@@ -42,9 +42,15 @@ def test_construct_simulated_training_set(W=2048, N=2048, S=128):
 
     np.savez_compressed(
         'simulated_data.npz',
-        reciprocal=diffraction,
-        real=patches,
-        scan=scan,
+        reciprocal=diffraction[1024:],
+        real=patches[1024:],
+        scan=scan[1024:],
+    )
+    np.savez_compressed(
+        'simulated_test.npz',
+        reciprocal=diffraction[:1024],
+        real=patches[:1024],
+        scan=scan[:1024],
     )
 
 if __name__ == '__main__':

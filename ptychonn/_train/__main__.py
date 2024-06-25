@@ -154,6 +154,10 @@ def train(
     batch_size: int = 32,
     training_fraction: float = 0.8,
     log_frequency: int = 50,
+    strategy: typing.Literal[
+        "ddp", "ddp_spawn", "auto", "fsdp", "deepspeed",
+    ] = "auto",
+    devices: int | typing.List[int] = -1,
 ) -> typing.Tuple[lightning.Trainer, lightning.pytorch.loggers.CSVLogger | ListLogger]:
     """Train a PtychoNN model.
 
@@ -184,6 +188,10 @@ def train(
         The proprotion of X_train and Y_train that is used for training.
     log_frequency
         Write to the logs every this number of steps
+    strategy
+        The method for training distribution across devices
+    devices
+        The indices of the devices to use for training
     """
     if batch_size <= 0:
         msg = f"Number of batches must be positive not f{batch_size}"
@@ -219,6 +227,8 @@ def train(
         logger=logger,
         enable_checkpointing=False if out_dir is None else True,
         log_every_n_steps=log_frequency,
+        strategy=strategy,
+        devices=devices,
     )
 
     train_dataloader, val_dataloader = create_training_dataloader(
