@@ -10,5 +10,4 @@ scikit-image
 scikit-learn
 scipy
 tifffile
-torch >=1.12,<2.1
 tqdm
