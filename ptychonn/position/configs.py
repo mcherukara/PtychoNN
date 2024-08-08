@@ -150,13 +150,12 @@ class RegistrationConfig(Config):
     """Image downsampling before registration."""
 
     hybrid_registration_algs: Sequence[str] = (
-        "error_map_multilevel",
         "error_map_expandable",
         "sift",
     )
     """Hybrid registration algorithms"""
 
-    hybrid_registration_tols: Sequence[float] = (0.15, 0.3, 0.3)
+    hybrid_registration_tols: Sequence[float] = (0.15, 0.3)
     """Hybrid registration tolerances. This value is disregarded unless registration method is hybrid."""
 
     nonhybrid_registration_tol: float = None
