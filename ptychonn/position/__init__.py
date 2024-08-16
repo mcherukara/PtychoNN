@@ -94,5 +94,5 @@ script.
 """
 
 from .configs import InferenceConfig, RegistrationConfig
-from .core import ProbePositionCorrectorChain
+from .core import ProbePositionCorrectorChain, PtychoNNProbePositionCorrector
 from .position_list import ProbePositionList
