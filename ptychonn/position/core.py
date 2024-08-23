@@ -121,7 +121,10 @@ class PtychoNNProbePositionCorrector:
             np.random.seed(self.configs.random_seed)
 
         assert isinstance(self.ptycho_reconstructor, VirtualReconstructor)
-        recons = tifffile.imread(self.configs.reconstruction_image_path)
+        if len(self.configs.reconstruction_image_path) > 0:
+            recons = tifffile.imread(self.configs.reconstruction_image_path)
+        else:
+            recons = self.configs.reconstruction_images
         self.ptycho_reconstructor.set_object_image_array(recons)
         self.ptycho_reconstructor.build()
 
