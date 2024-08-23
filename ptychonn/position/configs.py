@@ -4,6 +4,8 @@ import warnings
 from typing import Any, Optional, Union, Literal
 from collections.abc import Sequence
 
+import numpy as np
+
 from ptychonn.position.position_list import ProbePositionList
 from ptychonn.position.io import DataFileHandle
 
@@ -213,7 +215,13 @@ class InferenceConfig(Config):
 
     reconstruction_image_path: str = ''
     """
-    Path to the reconstructed images to be used for position prediction.
+    Path to the reconstructed images to be used for position prediction. If empty, then
+    `reconstruction_images` must be provided.
+    """
+    
+    reconstruction_images: Optional[np.ndarray] = None
+    """
+    Reconstructed images. Ignored if `reconstruction_image_path` is provided.
     """
 
     probe_position_list: Optional[ProbePositionList] = None
