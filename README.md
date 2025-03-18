@@ -8,12 +8,6 @@ The strucuture of the network is shown below:
 ![alt text](./fig1.png)
 
 ## Requires:
-git lfs
-
-* Data to train the network is hosted at the git lfs server due to its size
-
-* Run git lfs clone https://github.com/mcherukara/PtychoNN to download training and test data
-
 Tensorflow 1.14
 
 Keras 2.2.4
@@ -22,6 +16,10 @@ Keras 2.2.4
 Tf2 folder contains notebooks compatible with TF 2.x
 
 -- NOTE: notebooks were run in Google Colab, modify as required for local runtimes
+
+## Data:
+
+Training data and model weights are available at : https://huggingface.co/datasets/mcherukara/PtychoNN_data/tree/main
 
 ### Mixed precision training
 
